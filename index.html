@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Solicitud de cambio de software</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+
+  <body>
+    <!-- ============================ LOGIN ============================ -->
+    <main id="login-view" class="login">
+      <form id="loginForm" class="login-card" novalidate>
+        <h1>Solicitud de cambio</h1>
+        <p class="lead">Inicie sesión para continuar.</p>
+        <div class="f">
+          <label class="l req" for="lg-user">Usuario</label>
+          <input
+            id="lg-user"
+            autocomplete="username"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="f">
+          <label class="l req" for="lg-pass">Contraseña</label>
+          <input id="lg-pass" type="password" autocomplete="current-password" />
+        </div>
+        <div class="msg" id="lg-error" role="alert" hidden></div>
+        <button class="btn block" type="submit">Ingresar</button>
+        <p class="demo">
+          Cuentas de prueba: <b>dev</b> / dev123 (desarrollador) ·
+          <b>usuario</b> / user123
+        </p>
+      </form>
+    </main>
+
+    <!-- ============================ APLICACIÓN ============================ -->
+    <div id="app-view" class="layout" hidden>
+      <!-- Vista 1: Formulario de solicitud -->
+      <section id="view-form" hidden>
+        <div class="form-header-bar">
+          <button type="button" class="btn-ghost-back" id="btnFormBack">
+            <span class="back-arrow" aria-hidden="true">←</span> Volver al
+            historial
+          </button>
+          <div class="form-user-meta">
+            <span id="formRoleBadge" class="rolebadge"></span>
+            <button type="button" class="linkbtn" id="btnLogoutForm">
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+
+        <div class="stepper-wrap">
+          <nav
+            id="steps"
+            class="stepper-h"
+            aria-label="Fases del formulario"
+          ></nav>
+        </div>
+
+        <div class="panel form-panel" id="form-mount-point"></div>
+      </section>
+
+      <!-- Vista 2: Historial de solicitudes -->
+      <section id="view-hist" hidden>
+        <div class="panel">
+          <div class="hist-header">
+            <div class="hist-brand">
+              <span class="hist-title">Sistema de Control de Cambios</span>
+              <span id="histRoleBadge" class="rolebadge"></span>
+            </div>
+            <div class="hist-actions">
+              <button type="button" class="btn btn-new" id="btnHistNew">
+                + Nueva solicitud
+              </button>
+              <button type="button" class="linkbtn" id="btnLogoutHist">
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+          <div class="head">
+            <div>
+              <h2>Historial de solicitudes</h2>
+              <p class="lead" id="histLead"></p>
+            </div>
+          </div>
+          <!-- Barra de búsqueda y filtros -->
+          <div class="hist-filter-bar" id="histFilterBar">
+            <div class="hist-search-box">
+              <span class="hist-search-icon" aria-hidden="true">🔍</span>
+              <input
+                type="text"
+                id="histSearch"
+                class="hist-search-input"
+                placeholder="Buscar por N.º, tipo o solicitante..."
+                autocomplete="off"
+                aria-label="Buscar solicitudes por número, tipo o solicitante"
+              />
+              <button
+                type="button"
+                id="histSearchClear"
+                class="hist-search-clear"
+                title="Limpiar búsqueda"
+                aria-label="Limpiar búsqueda"
+                hidden
+              >×</button>
+            </div>
+            <div class="hist-filter-select-wrap">
+              <select id="histFilterTipo" class="hist-filter-select" aria-label="Filtrar por tipo de solicitud">
+                <option value="todos">Todos los tipos</option>
+                <option value="tecnica">Técnica</option>
+                <option value="usuario">Usuario</option>
+              </select>
+            </div>
+            <div class="hist-filter-select-wrap">
+              <select id="histFilterSol" class="hist-filter-select" aria-label="Filtrar por solicitante">
+                <option value="todos">Todos los solicitantes</option>
+              </select>
+            </div>
+            <div class="hist-count-badge" id="histCount" aria-live="polite"></div>
+          </div>
+          <div class="scroll">
+            <table id="histTable">
+              <thead id="histHead"></thead>
+              <tbody id="histRows"></tbody>
+            </table>
+          </div>
+          <p class="lead" id="histEmpty" hidden>
+            Aún no hay solicitudes registradas.
+          </p>
+        </div>
+      </section>
+
+      <!-- Vista 3: Detalle de solicitud -->
+      <section id="view-detail" hidden>
+        <div class="panel">
+          <div class="toolbar">
+            <button type="button" class="btn-ghost-back" id="btnDetailBack">
+              <span class="back-arrow" aria-hidden="true">←</span> Volver al
+              historial
+            </button>
+            <span class="spacer"></span>
+            <button type="button" class="btn sec" id="btnDetailPrint">
+              Imprimir / Guardar PDF
+            </button>
+          </div>
+          <div class="print-doc-header">
+            <div class="print-doc-brand">
+              UNIVERSIDAD TÉCNICA DE AMBATO · FISEI · SCM
+            </div>
+            <h2 id="detailTitle" class="detail-title"></h2>
+            <p class="lead" id="detailMeta"></p>
+          </div>
+          <span class="status ok" id="detailStatus"></span>
+          <div id="detailBody"></div>
+          <div class="print-signatures">
+            <div class="print-sig-col">
+              <div class="print-sig-line"></div>
+              <div class="print-sig-role">Desarrollador Responsable</div>
+              <div class="print-sig-sub">Firma del Solicitante</div>
+            </div>
+            <div class="print-sig-col">
+              <div class="print-sig-line"></div>
+              <div class="print-sig-role">Lead Reviewer / Auditor SCM</div>
+              <div class="print-sig-sub">Revisión Técnica y QA</div>
+            </div>
+            <div class="print-sig-col">
+              <div class="print-sig-line"></div>
+              <div class="print-sig-role">Comité CCB (Dictamen)</div>
+              <div class="print-sig-sub">
+                [ &nbsp; ] Aprobado &nbsp;&nbsp; [ &nbsp; ] Rechazado
+              </div>
+            </div>
+          </div>
+          <div class="print-doc-footer">
+            Documento técnico de control de cambios emitido conforme a la norma
+            IEEE 828 · FISEI · Universidad Técnica de Ambato
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        Sistema de Control de Cambios de Software · Cátedra de Manejo y
+        Configuración del Software (FISEI / UTA)
+      </footer>
+    </div>
+
+    <!-- Avisos emergentes (arriba a la derecha) -->
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <!-- Modal genérico -->
+    <div
+      id="modal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalTitle"
+      hidden
+    >
+      <div class="modal">
+        <div class="modal-icon" aria-hidden="true">✓</div>
+        <h3 id="modalTitle"></h3>
+        <p id="modalText"></p>
+        <div class="modal-actions" id="modalActions"></div>
+      </div>
+    </div>
+
+    <!-- ============================ PLANTILLA: FORMULARIO DESARROLLADOR ============================ -->
+    <template id="tpl-dev-form">
+      <div class="toolbar" role="toolbar" aria-label="Acciones del formulario">
+        <span class="toolbar-hint"
+          >Formulario de Control de Cambios Técnicos (RFC / SCM)</span
+        >
+        <span class="spacer"></span>
+        <span
+          class="draft-pill"
+          id="devDraftIndicator"
+          title="Se guardan automáticamente los datos mientras escribe"
+          >Borrador guardado</span
+        >
+        <button type="button" class="btn sec sm" data-act="example">
+          Cargar ejemplo
+        </button>
+      </div>
+
+      <form id="devForm" novalidate autocomplete="off">
+        <!-- Fase 1 -->
+        <section class="pane">
+          <div class="pane-header">
+            <h2>Identificación y trazabilidad técnica</h2>
+            <div class="code-badge-box">
+              <span class="code-badge-label">Código:</span>
+              <span class="code-badge-val mono" id="codigoDisplay"
+                >CR-2026-0001</span
+              >
+              <input type="hidden" id="codigo" />
+            </div>
+          </div>
+
+          <div class="subhead">Fechas de control</div>
+          <div class="grid">
+            <div class="f">
+              <label class="l req" for="fechaSolicitud"
+                >Fecha de solicitud</label
+              ><input id="fechaSolicitud" type="date" />
+            </div>
+            <div class="f">
+              <label class="l req" for="fechaRequerida"
+                >Fecha requerida de pase</label
+              ><input id="fechaRequerida" type="date" />
+            </div>
+          </div>
+
+          <div class="subhead">Responsables técnicos</div>
+          <div class="grid">
+            <div class="f">
+              <label class="l req" for="solicitante"
+                >Desarrollador responsable</label
+              ><input
+                id="solicitante"
+                autocomplete="name"
+                placeholder="Ej: Ing. Carlos Mendoza (Dev Backend)"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="correo">Correo institucional</label
+              ><input
+                id="correo"
+                type="email"
+                autocomplete="email"
+                placeholder="Ej: cmendoza@institucion.edu.ec"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="leadReviewer"
+                >Lead Reviewer / Auditor SCM</label
+              ><input
+                id="leadReviewer"
+                placeholder="Ej: Ing. Patricia Torres"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="departamento">Departamento / Área</label
+              ><input
+                id="departamento"
+                placeholder="Ej: Dirección de TI/Desarrollo"
+              />
+            </div>
+          </div>
+
+          <div class="subhead">Control de versiones (Git)</div>
+          <div class="grid">
+            <div class="f full">
+              <label class="l req" for="repositorio"
+                >Repositorio y servicio</label
+              ><input
+                id="repositorio"
+                class="mono"
+                placeholder="Ej: fisei-uta/gestion-academica"
+                autocapitalize="off"
+                spellcheck="false"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="ramaOrigen">Rama origen</label
+              ><input
+                id="ramaOrigen"
+                class="mono"
+                placeholder="Ej: feature/ejemplo"
+                autocapitalize="off"
+                spellcheck="false"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="ramaDestino">Rama destino</label>
+              <select id="ramaDestino" class="mono">
+                <option value="main (Producción)">main (Producción)</option>
+                <option value="release/v2.4">release/v2.4</option>
+                <option value="develop">develop</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Fase 2 -->
+        <section class="pane" hidden>
+          <h2>Información técnica del cambio</h2>
+          <p class="lead">Qué se modifica y por qué.</p>
+
+          <div class="subhead">Clasificación</div>
+          <div class="grid">
+            <div class="f">
+              <label class="l req" for="sistema"
+                >Sistema o módulo afectado</label
+              ><input id="sistema" placeholder="Ej: Módulo de Autenticación" />
+            </div>
+            <div class="f">
+              <label class="l req" for="tipoCambio">Tipo de cambio</label>
+              <select id="tipoCambio">
+                <option value="">Seleccione…</option>
+                <option>Correctivo</option>
+                <option>Evolutivo / mejora</option>
+                <option>Adaptativo</option>
+                <option>Emergencia</option>
+                <option>Nuevo desarrollo</option>
+              </select>
+            </div>
+            <div class="f">
+              <label class="l req" for="prioridad">Prioridad</label>
+              <select id="prioridad">
+                <option value="">Seleccione…</option>
+                <option>Baja</option>
+                <option>Media</option>
+                <option>Alta</option>
+                <option>Crítica</option>
+              </select>
+            </div>
+            <div class="f">
+              <label class="l req" for="origen">Origen de la solicitud</label>
+              <select id="origen">
+                <option value="">Seleccione…</option>
+                <option>Incidente</option>
+                <option>Auditoría</option>
+                <option>Usuario interno</option>
+                <option>Cliente externo</option>
+                <option>Requisito legal o normativo</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="subhead">Detalle técnico</div>
+          <div class="grid">
+            <div class="f full">
+              <div class="field-header">
+                <label class="l req" for="descripcion"
+                  >Descripción del cambio</label
+                >
+                <span class="char-counter" data-for="descripcion" data-min="25"
+                  ><span class="cnt">0</span>/25 mín.</span
+                >
+              </div>
+
+              <textarea
+                id="descripcion"
+                placeholder="Ej: Implementación de inicio de sesión único (SSO) mediante OAuth 2.0 y JWT..."
+              ></textarea>
+            </div>
+            <div class="f full">
+              <div class="field-header">
+                <label class="l req" for="justificacion"
+                  >Justificación del cambio</label
+                >
+                <span
+                  class="char-counter"
+                  data-for="justificacion"
+                  data-min="25"
+                  ><span class="cnt">0</span>/25 mín.</span
+                >
+              </div>
+              <textarea
+                id="justificacion"
+                placeholder="Ej: Resuelve las vulnerabilidades identificadas en la auditoría técnica SCM-2026..."
+              ></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- Fase 3 -->
+        <section class="pane" hidden>
+          <h2>Riesgo, pruebas y plan de reversión</h2>
+          <p class="lead">
+            Cómo se validó el cambio y cómo se revierte si falla.
+          </p>
+
+          <div class="subhead">Evaluación de impacto</div>
+          <div class="grid">
+            <div class="f">
+              <label class="l req" for="riesgo">Nivel de riesgo</label>
+              <select id="riesgo">
+                <option value="">Seleccione…</option>
+                <option>Baja</option>
+                <option>Medio</option>
+                <option>Alto</option>
+                <option>Crítico</option>
+              </select>
+            </div>
+            <div class="f">
+              <label class="l req" for="ambiente"
+                >Ambiente de implementación</label
+              >
+              <select id="ambiente">
+                <option value="">Seleccione…</option>
+                <option value="Desarrollo">Desarrollo</option>
+                <option value="Pruebas / QA">Pruebas / QA</option>
+                <option value="Producción" selected>Producción</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="subhead">Estrategia de validación y contingencia</div>
+          <div class="grid">
+            <div class="f full">
+              <div class="field-header">
+                <label class="l req" for="pruebas">Pruebas y cobertura</label>
+                <span class="char-counter" data-for="pruebas" data-min="20"
+                  ><span class="cnt">0</span>/20 mín.</span
+                >
+              </div>
+              <textarea
+                id="pruebas"
+                placeholder="Ej: Pruebas unitarias ejecutadas con Jest (cobertura 92%). Superadas pruebas de integración..."
+              ></textarea>
+            </div>
+            <div class="f full">
+              <div class="field-header">
+                <label class="l req" for="rollback"
+                  >Plan de reversión (rollback)</label
+                >
+                <span class="char-counter" data-for="rollback" data-min="20"
+                  ><span class="cnt">0</span>/20 mín.</span
+                >
+              </div>
+              <textarea
+                id="rollback"
+                class="mono"
+                placeholder="Ej: 1. git revert -m 1 &lt;hash_del_commit&gt;&#10;2. Ejecutar rollback de base de datos: npm run db:rollback&#10;3. Re-desplegar la versión v2.3.9 en el clúster&#10;4. Verificar logs de monitoreo en Graylog"
+              ></textarea>
+            </div>
+          </div>
+        </section>
+
+        <div class="nav">
+          <button type="button" class="btn sec" data-act="prev" id="devPrev">
+            Anterior
+          </button>
+          <span class="kbd-hint"
+            ><kbd>Ctrl</kbd> + <kbd>Enter</kbd> para avanzar</span
+          >
+          <button type="button" class="btn" data-act="next" id="devNext">
+            Siguiente
+          </button>
+        </div>
+      </form>
+
+      <!-- Vista previa -->
+      <section id="devPreview" class="preview" hidden>
+        <div class="print-doc-header">
+          <div class="print-doc-brand">
+            UNIVERSIDAD TÉCNICA DE AMBATO · FISEI · SCM
+          </div>
+          <h2>Ficha de entrega técnica para el CCB</h2>
+          <p class="lead">
+            Formulario oficial de Solicitud de Cambio de Software (RFC / SCM)
+          </p>
+        </div>
+        <span class="status" id="devBadge"></span>
+        <div id="devSummary"></div>
+        <div class="print-signatures">
+          <div class="print-sig-col">
+            <div class="print-sig-line"></div>
+            <div class="print-sig-role">Desarrollador Responsable</div>
+            <div class="print-sig-sub">Firma del Solicitante</div>
+          </div>
+          <div class="print-sig-col">
+            <div class="print-sig-line"></div>
+            <div class="print-sig-role">Lead Reviewer / Auditor SCM</div>
+            <div class="print-sig-sub">Revisión Técnica y QA</div>
+          </div>
+          <div class="print-sig-col">
+            <div class="print-sig-line"></div>
+            <div class="print-sig-role">Comité CCB (Dictamen)</div>
+            <div class="print-sig-sub">
+              [ &nbsp; ] Aprobado &nbsp;&nbsp; [ &nbsp; ] Rechazado
+            </div>
+          </div>
+        </div>
+        <div class="print-doc-footer">
+          Documento técnico de control de cambios emitido conforme a la norma
+          IEEE 828 · FISEI · Universidad Técnica de Ambato
+        </div>
+        <div class="actions" id="devPreActions">
+          <button type="button" class="btn" data-act="send">
+            Validar y Enviar Solicitud al CCB
+          </button>
+          <button type="button" class="btn sec" data-act="form" id="devBtnForm">
+            Volver al formulario
+          </button>
+          <button type="button" class="btn sec" data-act="print">
+            Imprimir / Guardar PDF
+          </button>
+        </div>
+        <div class="actions" id="devSentActions" hidden>
+          <button type="button" class="btn sec" data-act="print">
+            Imprimir / Guardar PDF
+          </button>
+          <button type="button" class="btn sec" data-act="hist">
+            Ver historial
+          </button>
+          <button type="button" class="btn" data-act="new">
+            Crear otra solicitud
+          </button>
+        </div>
+      </section>
+    </template>
+
+    <!-- ============================ PLANTILLA: FORMULARIO USUARIO ============================ -->
+    <template id="tpl-user-form">
+      <form id="userForm" novalidate autocomplete="off">
+        <section class="pane">
+          <h2>Sus datos</h2>
+          <p class="lead">
+            Para saber quién pide el cambio y cómo avisarle cuando avance.
+          </p>
+          <div class="grid">
+            <div class="f">
+              <label class="l req" for="nombre">Nombre completo</label
+              ><input
+                id="nombre"
+                autocomplete="name"
+                placeholder="Ej: Ana Lucía Morales"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="correo">Correo electrónico</label
+              ><input
+                id="correo"
+                type="email"
+                autocomplete="email"
+                placeholder="Ej: amorales@institucion.edu.ec"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="area">Área o departamento</label
+              ><input
+                id="area"
+                placeholder="Ej: Departamento de Recursos Humanos"
+              />
+            </div>
+            <div class="f">
+              <label class="l" for="tel">Teléfono o extensión</label
+              ><input
+                id="tel"
+                type="tel"
+                autocomplete="tel"
+                placeholder="Ej: Ext. 4022 / 0991234567"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section class="pane" hidden>
+          <h2>¿Qué necesita cambiar?</h2>
+          <p class="lead">
+            Cuéntenos con sus palabras qué quiere que sea diferente, qué tan
+            importante es y para cuándo lo necesita.
+          </p>
+          <div class="grid">
+            <div class="f full">
+              <label class="l req" for="titulo">Título corto</label
+              ><input
+                id="titulo"
+                maxlength="120"
+                placeholder="Ej: Agregar botón de exportación a Excel en el listado de empleados"
+              />
+            </div>
+            <div class="f">
+              <label class="l req" for="tipo">Tipo de cambio</label>
+              <select id="tipo">
+                <option value="">Seleccione…</option>
+                <option>Normal: se puede planificar</option>
+                <option>Estándar: pequeño y ya conocido</option>
+                <option>Emergencia: algo dejó de funcionar</option>
+              </select>
+            </div>
+            <div class="f">
+              <label class="l req" for="categoria">¿De qué se trata?</label>
+              <select id="categoria">
+                <option value="">Seleccione…</option>
+                <option>Nueva funcionalidad</option>
+                <option>Mejorar algo que ya existe</option>
+                <option>Corregir un error</option>
+                <option>Cambio de configuración</option>
+                <option>Seguridad o cumplimiento</option>
+                <option>Velocidad o rendimiento</option>
+                <option>Base de datos o conexión con otro sistema</option>
+              </select>
+            </div>
+            <div class="f full">
+              <label class="l req" for="sistema">Aplicación o sistema</label
+              ><input
+                id="sistema"
+                placeholder="Ej: Sistema de Gestión de Personal / Portal del Empleado"
+              />
+            </div>
+            <div class="f full">
+              <label class="l req" for="desc">Descripción</label>
+              <p class="hint">Qué ocurre hoy y qué debería ocurrir después.</p>
+              <textarea
+                id="desc"
+                placeholder="Ej: Al consultar la lista de asistencia, se requiere un botón que permita descargar el reporte en formato Excel (.xlsx)."
+              ></textarea>
+            </div>
+            <div class="f full">
+              <label class="l req" for="just">¿Para qué lo necesita?</label>
+              <p class="hint">Qué problema resuelve o qué beneficio aporta.</p>
+              <textarea
+                id="just"
+                placeholder="Ej: Permitirá al equipo de nómina conciliar las horas trabajadas en menos tiempo sin transcripciones manuales."
+              ></textarea>
+            </div>
+            <div class="f full">
+              <span class="lab req" id="lp">¿Qué tan importante es?</span>
+              <div
+                class="prs"
+                id="g-prioridad"
+                role="radiogroup"
+                aria-labelledby="lp"
+              >
+                <label class="pr alta"
+                  ><input type="radio" name="prioridad" value="Alta" /><span
+                    class="box"
+                    ><b>Alta</b
+                    ><small>No puedo trabajar o se pierde dinero</small></span
+                  ></label
+                >
+                <label class="pr media"
+                  ><input type="radio" name="prioridad" value="Media" /><span
+                    class="box"
+                    ><b>Media</b
+                    ><small
+                      >Me afecta, pero hay una solución temporal</small
+                    ></span
+                  ></label
+                >
+                <label class="pr baja"
+                  ><input type="radio" name="prioridad" value="Baja" /><span
+                    class="box"
+                    ><b>Baja</b
+                    ><small>Es una mejora y puede esperar</small></span
+                  ></label
+                >
+              </div>
+            </div>
+            <div class="f">
+              <label class="l req" for="fecha">Fecha en que lo necesita</label
+              ><input id="fecha" type="date" />
+            </div>
+            <div class="f full">
+              <label class="l" for="aceptacion"
+                >¿Cómo sabrá que el cambio quedó bien?</label
+              ><textarea
+                id="aceptacion"
+                placeholder="Ej: Al pulsar el botón 'Exportar Excel', se descarga el archivo con todas las columnas y abre sin errores en Excel."
+              ></textarea>
+            </div>
+            <div class="f full">
+              <label class="l" for="ref">Enlace o referencia</label
+              ><input
+                id="ref"
+                placeholder="Ej: Ticket de soporte #3482 o URL de la intranet"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section class="pane" hidden>
+          <h2>Revise y envíe</h2>
+          <p class="lead">
+            Confirme que todo esté correcto. Puede editar cualquier sección.
+          </p>
+          <div id="uResumen"></div>
+        </section>
+
+        <div class="nav">
+          <button type="button" class="btn sec" data-act="prev" id="uPrev">
+            Atrás
+          </button>
+          <button type="button" class="btn" data-act="next" id="uNext">
+            Siguiente
+          </button>
+        </div>
+      </form>
+
+      <div id="uDone" hidden>
+        <div class="done-box">
+          <div class="tick" aria-hidden="true">✓</div>
+          <h2 id="uDoneId"></h2>
+          <p id="uDoneTxt" class="lead"></p>
+          <div class="actions">
+            <button type="button" class="btn sec" data-act="print">
+              Imprimir o guardar en PDF
+            </button>
+            <button type="button" class="btn sec" data-act="hist">
+              Ver historial
+            </button>
+            <button type="button" class="btn" data-act="new">
+              Crear otra solicitud
+            </button>
+          </div>
+        </div>
+        <div id="uDoneSummary"></div>
+      </div>
+    </template>
+
+    <script src="js/utils.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/validator.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dev-form.js"></script>
+    <script src="js/user-form.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
