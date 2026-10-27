@@ -10,6 +10,8 @@
   const App = (window.App = window.App || {});
 
   const STEPS = [{ title: 'Sus datos' }, { title: 'El cambio' }, { title: 'Revisar y enviar' }];
+  const DRAFT_FIELDS = ['nombre', 'correo', 'area', 'tel', 'titulo', 'tipo', 'categoria', 'sistema', 'desc', 'just', 'fecha', 'aceptacion', 'ref'];
+  const DRAFT_KEY = 'rfc-draft-user';
   const N = STEPS.length;
   const STEP_FIELDS = [
     ['nombre', 'correo', 'area', 'tel'],
@@ -34,7 +36,7 @@
       nombre: { min: 3 },
       correo: { re: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, msg: 'Escriba un correo válido, por ejemplo nombre@empresa.com.' },
       area: { min: 2 },
-      tel: { optional: true, re: /^[\d\s+()-]{3,}$/, msg: 'Use solo números, espacios y + ( ) -.' },
+      tel: { optional: true, re: /^(?=.*\d)[\w\s+().\/-]{3,}$/, msg: 'Escriba un teléfono o extensión válido, por ejemplo Ext. 4022 o 0991234567.' },
       titulo: { min: 5 },
       tipo: {},
       categoria: {},
@@ -65,7 +67,7 @@
       if (!b || !root.contains(b)) return;
       if (b.hasAttribute('data-edit')) { go(parseInt(b.getAttribute('data-edit'), 10)); return; }
       const actions = {
-        prev: () => go(cur - 1), next: onNext, print: () => window.print(),
+        prev: () => go(cur - 1), next: onNext, print: () => window.print(), example: fillExample,
         hist: () => App.openHistory(), new: () => { nuevo(); App.show('form'); },
       };
       if (actions[b.getAttribute('data-act')]) actions[b.getAttribute('data-act')]();
@@ -73,15 +75,100 @@
 
     sent = false; last = null; cur = 0; sub = 'form';
     prefill();
+    restoreDraft();
+    bindCharCounters();
     root.querySelectorAll('textarea').forEach((ta) => {
       ta.addEventListener('input', () => autoResize(ta));
     });
     paint();
+
+    form.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        onNext();
+      }
+    });
+    form.addEventListener('input', saveDraft);
+    form.addEventListener('change', saveDraft);
   }
 
   function prefill() {
     q('nombre').value = user.name;
     q('correo').value = user.email;
+    if (q('uCodigoDisplay')) q('uCodigoDisplay').textContent = App.store.nextId('RFC');
+  }
+
+  /* ---------- Borrador, contadores y ejemplo (igual que el formulario técnico) ---------- */
+  function saveDraft() {
+    if (sent) return;
+    try {
+      const d = {};
+      DRAFT_FIELDS.forEach((id) => { d[id] = q(id).value; });
+      d.prioridad = prio();
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    } catch (e) {}
+  }
+  function restoreDraft() {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      DRAFT_FIELDS.forEach((id) => { if (d[id] != null && d[id] !== '') q(id).value = d[id]; });
+      if (d.prioridad) {
+        const r = form.querySelector('input[name=prioridad][value="' + d.prioridad + '"]');
+        if (r) r.checked = true;
+      }
+    } catch (e) {}
+  }
+  function clearDraft() {
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  }
+
+  function updateCharCounters() {
+    root.querySelectorAll('.char-counter').forEach((box) => {
+      const input = q(box.getAttribute('data-for'));
+      if (!input) return;
+      const min = parseInt(box.getAttribute('data-min'), 10);
+      const len = (input.value || '').trim().length;
+      const cnt = box.querySelector('.cnt');
+      if (cnt) cnt.textContent = len;
+      box.classList.toggle('ready', len >= min);
+    });
+  }
+  function bindCharCounters() {
+    root.querySelectorAll('.char-counter').forEach((box) => {
+      const input = q(box.getAttribute('data-for'));
+      if (input) input.addEventListener('input', updateCharCounters);
+    });
+    updateCharCounters();
+  }
+
+  function fillExample() {
+    q('titulo').value = 'Agregar botón de exportación a Excel en el listado de empleados';
+    q('area').value = q('area').value || 'Departamento de Recursos Humanos';
+    q('tel').value = q('tel').value || 'Ext. 4022';
+    q('tipo').selectedIndex = 1;
+    q('categoria').selectedIndex = 1;
+    q('sistema').value = 'Sistema de Gestión de Personal / Portal del Empleado';
+    q('desc').value = 'Al consultar la lista de asistencia, se requiere un botón que permita descargar el reporte en formato Excel (.xlsx) con todas las columnas visibles.';
+    q('just').value = 'Permitirá al equipo de nómina conciliar las horas trabajadas en menos tiempo y sin transcripciones manuales.';
+    const r = form.querySelector('input[name=prioridad][value="Media"]');
+    if (r) r.checked = true;
+    q('fecha').value = App.addDays(14);
+    q('aceptacion').value = "Al pulsar el botón 'Exportar Excel', se descarga el archivo con todas las columnas y abre sin errores en Excel.";
+    updateCharCounters();
+    resizeAllTextareas();
+    saveDraft();
+    validator.validateStep(cur);
+    refresh();
+    App.toast('Datos de ejemplo cargados en el formulario.', 'info');
+  }
+
+  function focusFirstField() {
+    const pane = panes[cur];
+    if (!pane) return;
+    const first = pane.querySelector('input:not([readonly]):not([type=hidden]):not([type=radio]),select,textarea');
+    if (first) setTimeout(() => first.focus({ preventScroll: true }), 40);
   }
 
   /* ---------- Navegación ---------- */
@@ -98,6 +185,7 @@
     paint();
     App.show('form');
     App.top();
+    focusFirstField();
   }
   function onNext() {
     if (cur < N - 1) {
@@ -149,6 +237,7 @@
       secciones: sections(),
     };
     App.store.save(r);
+    clearDraft();
     last = r;
     sent = true;
     sub = 'done';
@@ -164,13 +253,12 @@
   }
 
   function nuevo() {
+    clearDraft();
     form.reset();
     validator.reset();
     sent = false; last = null; cur = 0; sub = 'form';
     prefill();
-    root.querySelectorAll('textarea').forEach((ta) => {
-      ta.addEventListener('input', () => autoResize(ta));
-    });
+    updateCharCounters();
     paint();
   }
 
@@ -191,6 +279,8 @@
     panes.forEach((p, i) => { p.hidden = i !== cur; });
     form.hidden = sub !== 'form';
     q('uDone').hidden = sub !== 'done';
+    const tb = root.querySelector('.toolbar');
+    if (tb) tb.hidden = sub === 'done';
     q('uPrev').style.visibility = cur === 0 ? 'hidden' : 'visible';
     q('uNext').textContent = cur === N - 1 ? 'Enviar solicitud' : 'Siguiente';
     if (cur === N - 1 && sub === 'form') q('uResumen').innerHTML = App.sectionsHTML(sections(), true);
@@ -209,6 +299,7 @@
     return {
       items: STEPS.map((s, i) => ({
         label: s.title, done: done[i], current: onForm && cur === i,
+        sub: done[i] ? 'Completado' : onForm && cur === i ? 'En proceso' : 'Pendiente',
         onClick: () => { if (sent) { nuevo(); App.show('form'); return; } go(i); },
       })),
       pct: Math.round((n / N) * 100),

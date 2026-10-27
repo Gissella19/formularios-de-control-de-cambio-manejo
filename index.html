@@ -550,12 +550,37 @@
 
     <!-- ============================ PLANTILLA: FORMULARIO USUARIO ============================ -->
     <template id="tpl-user-form">
+      <div class="toolbar" role="toolbar" aria-label="Acciones del formulario">
+        <span class="toolbar-hint">Formulario de Solicitud de Cambio</span>
+        <span class="spacer"></span>
+        <span
+          class="draft-pill"
+          id="userDraftIndicator"
+          title="Se guardan automáticamente los datos mientras escribe"
+          >Borrador guardado</span
+        >
+        <button type="button" class="btn sec sm" data-act="example">
+          Cargar ejemplo
+        </button>
+      </div>
+
       <form id="userForm" novalidate autocomplete="off">
+        <!-- Paso 1 -->
         <section class="pane">
-          <h2>Sus datos</h2>
+          <div class="pane-header">
+            <h2>Sus datos</h2>
+            <div class="code-badge-box">
+              <span class="code-badge-label">Código:</span>
+              <span class="code-badge-val mono" id="uCodigoDisplay"
+                >RFC-2026-0001</span
+              >
+            </div>
+          </div>
           <p class="lead">
             Para saber quién pide el cambio y cómo avisarle cuando avance.
           </p>
+
+          <div class="subhead">Identificación</div>
           <div class="grid">
             <div class="f">
               <label class="l req" for="nombre">Nombre completo</label
@@ -566,19 +591,23 @@
               />
             </div>
             <div class="f">
+              <label class="l req" for="area">Área o departamento</label
+              ><input
+                id="area"
+                placeholder="Ej: Departamento de Recursos Humanos"
+              />
+            </div>
+          </div>
+
+          <div class="subhead">Contacto</div>
+          <div class="grid">
+            <div class="f">
               <label class="l req" for="correo">Correo electrónico</label
               ><input
                 id="correo"
                 type="email"
                 autocomplete="email"
                 placeholder="Ej: amorales@institucion.edu.ec"
-              />
-            </div>
-            <div class="f">
-              <label class="l req" for="area">Área o departamento</label
-              ><input
-                id="area"
-                placeholder="Ej: Departamento de Recursos Humanos"
               />
             </div>
             <div class="f">
@@ -593,12 +622,15 @@
           </div>
         </section>
 
+        <!-- Paso 2 -->
         <section class="pane" hidden>
           <h2>¿Qué necesita cambiar?</h2>
           <p class="lead">
             Cuéntenos con sus palabras qué quiere que sea diferente, qué tan
             importante es y para cuándo lo necesita.
           </p>
+
+          <div class="subhead">Clasificación</div>
           <div class="grid">
             <div class="f full">
               <label class="l req" for="titulo">Título corto</label
@@ -637,8 +669,17 @@
                 placeholder="Ej: Sistema de Gestión de Personal / Portal del Empleado"
               />
             </div>
+          </div>
+
+          <div class="subhead">Detalle del cambio</div>
+          <div class="grid">
             <div class="f full">
-              <label class="l req" for="desc">Descripción</label>
+              <div class="field-header">
+                <label class="l req" for="desc">Descripción</label>
+                <span class="char-counter" data-for="desc" data-min="20"
+                  ><span class="cnt">0</span>/20 mín.</span
+                >
+              </div>
               <p class="hint">Qué ocurre hoy y qué debería ocurrir después.</p>
               <textarea
                 id="desc"
@@ -646,13 +687,22 @@
               ></textarea>
             </div>
             <div class="f full">
-              <label class="l req" for="just">¿Para qué lo necesita?</label>
+              <div class="field-header">
+                <label class="l req" for="just">¿Para qué lo necesita?</label>
+                <span class="char-counter" data-for="just" data-min="15"
+                  ><span class="cnt">0</span>/15 mín.</span
+                >
+              </div>
               <p class="hint">Qué problema resuelve o qué beneficio aporta.</p>
               <textarea
                 id="just"
                 placeholder="Ej: Permitirá al equipo de nómina conciliar las horas trabajadas en menos tiempo sin transcripciones manuales."
               ></textarea>
             </div>
+          </div>
+
+          <div class="subhead">Importancia y plazo</div>
+          <div class="grid">
             <div class="f full">
               <span class="lab req" id="lp">¿Qué tan importante es?</span>
               <div
@@ -690,6 +740,10 @@
               <label class="l req" for="fecha">Fecha en que lo necesita</label
               ><input id="fecha" type="date" />
             </div>
+          </div>
+
+          <div class="subhead">Cierre y referencias (opcional)</div>
+          <div class="grid">
             <div class="f full">
               <label class="l" for="aceptacion"
                 >¿Cómo sabrá que el cambio quedó bien?</label
@@ -708,6 +762,7 @@
           </div>
         </section>
 
+        <!-- Paso 3 -->
         <section class="pane" hidden>
           <h2>Revise y envíe</h2>
           <p class="lead">
@@ -718,8 +773,11 @@
 
         <div class="nav">
           <button type="button" class="btn sec" data-act="prev" id="uPrev">
-            Atrás
+            Anterior
           </button>
+          <span class="kbd-hint"
+            ><kbd>Ctrl</kbd> + <kbd>Enter</kbd> para avanzar</span
+          >
           <button type="button" class="btn" data-act="next" id="uNext">
             Siguiente
           </button>
