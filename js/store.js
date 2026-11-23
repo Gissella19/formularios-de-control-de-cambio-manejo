@@ -16,6 +16,7 @@
   const USERS = [
     { user: 'dev', pass: 'dev123', role: 'desarrollador', name: 'Desarrollador Demo', email: 'dev@empresa.com' },
     { user: 'usuario', pass: 'user123', role: 'usuario', name: 'Usuario Demo', email: 'usuario@empresa.com' },
+    { user: 'comite', pass: 'comite123', role: 'comite', name: 'Comité CCB', email: 'comite@empresa.com' },
   ];
 
   function area(kind) {
@@ -60,10 +61,10 @@
 
     /* ---- Solicitudes ---- */
     all: () => readReq(),
-    /* El desarrollador ve todas; el usuario solo las suyas. */
+    /* El desarrollador y el comité ven todas; el usuario solo las suyas. */
     visibleFor(user) {
       const list = readReq();
-      return user.role === 'desarrollador' ? list : list.filter((r) => r.autor && r.autor.usuario === user.usuario);
+      return user.role === 'desarrollador' || user.role === 'comite' ? list : list.filter((r) => r.autor && r.autor.usuario === user.usuario);
     },
     get: (id) => readReq().find((r) => r.id === id) || null,
     exists: (id) => readReq().some((r) => r.id === id),
@@ -73,6 +74,17 @@
       if (i >= 0) list[i] = rec; else list.push(rec);
       writeReq(list);
       return rec;
+    },
+    /* Modifica una solicitud sobre la copia más reciente guardada: fn(copia) la edita. */
+    update(id, fn) {
+      const list = readReq().slice();
+      const i = list.findIndex((r) => r.id === id);
+      if (i < 0) return null;
+      const copy = JSON.parse(JSON.stringify(list[i]));
+      fn(copy);
+      list[i] = copy;
+      writeReq(list);
+      return copy;
     },
     /* Siguiente número correlativo del año: PREFIJO-AAAA-0001 */
     nextId(prefix) {

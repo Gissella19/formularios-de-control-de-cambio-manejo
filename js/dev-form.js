@@ -17,7 +17,7 @@
   ];
   const STEP_FIELDS = [
     ['fechaSolicitud', 'fechaRequerida', 'solicitante', 'leadReviewer', 'departamento', 'correo', 'repositorio', 'ramaOrigen', 'ramaDestino'],
-    ['sistema', 'tipoCambio', 'prioridad', 'origen', 'descripcion', 'justificacion'],
+    ['sistema', 'claseCambio', 'tipoCambio', 'prioridad', 'origen', 'descripcion', 'justificacion'],
     ['riesgo', 'ambiente', 'pruebas', 'rollback'],
   ];
   const ALL_FIELDS = ['codigo'].concat(STEP_FIELDS[0], STEP_FIELDS[1], STEP_FIELDS[2]);
@@ -52,12 +52,13 @@
       },
       solicitante: { min: 4 },
       leadReviewer: { min: 4 },
-      departamento: { min: 3 },
+      departamento: {},
       correo: { re: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, msg: 'Ingrese un correo válido.' },
       repositorio: { re: /^[\w.-]+\/[\w.-]+$/, msg: 'Use el formato organizacion/repositorio.' },
       ramaOrigen: { re: /^\S{2,}$/, msg: 'Nombre de rama no válido (sin espacios).' },
       ramaDestino: {},
       sistema: { min: 3 },
+      claseCambio: {},
       tipoCambio: {},
       prioridad: {},
       origen: {},
@@ -78,6 +79,7 @@
     root.appendChild(App.byId('tpl-dev-form').content.cloneNode(true));
     container.appendChild(root);
 
+    App.fillSelect(q('departamento'), App.DEPARTAMENTOS);
     form = q('devForm');
     panes = [].slice.call(form.querySelectorAll('.pane'));
     validator = App.createValidator(root, { fields: rules(), steps: STEP_FIELDS });
@@ -217,11 +219,12 @@
 
   function fillExample() {
     q('leadReviewer').value = 'Ing. Patricia Torres (Tech Lead / QA)';
-    q('departamento').value = 'Dirección de TI - Departamento de Desarrollo';
+    q('departamento').value = 'Dirección de TI / Desarrollo';
     q('repositorio').value = 'fisei-uta/gestion-academica';
     q('ramaOrigen').value = 'feature/CR-2026-login-oauth2';
     q('ramaDestino').value = 'main (Producción)';
     q('sistema').value = 'Módulo de Autenticación y Matrículas Web';
+    q('claseCambio').value = 'Normal';
     q('tipoCambio').value = 'Evolutivo / mejora';
     q('prioridad').value = 'Alta';
     q('origen').value = 'Auditoría';
@@ -330,8 +333,9 @@
   }
 
   /* ---------- Vista previa ---------- */
-  function sections() {
-    const g = val;
+  /* Construye la ficha a partir de un objeto de datos (también la usa el comité al editar). */
+  function buildSections(d) {
+    const g = (id) => String(d[id] == null ? '' : d[id]).trim();
     return [
       { titulo: 'Identificación y trazabilidad técnica', filas: [
         ['Código de solicitud', g('codigo'), 'mono'],
@@ -347,7 +351,8 @@
       ] },
       { titulo: 'Información técnica del cambio', filas: [
         ['Sistema o módulo afectado', g('sistema')],
-        ['Tipo de cambio', g('tipoCambio')],
+        ['Tipo de cambio', g('claseCambio'), 'clase'],
+        ['Naturaleza del cambio', g('tipoCambio')],
         ['Prioridad', g('prioridad'), 'tag'],
         ['Origen de la solicitud', g('origen')],
         ['Descripción del cambio', g('descripcion'), 'long'],
@@ -362,14 +367,23 @@
     ];
   }
 
-  function buildRecord() {
+  function formData() {
     const datos = {};
     ALL_FIELDS.forEach((id) => { datos[id] = val(id); });
+    return datos;
+  }
+  const sections = () => buildSections(formData());
+
+  function buildRecord() {
+    const datos = formData();
+    const ahora = new Date().toISOString();
     return {
       id: val('codigo'),
       tipo: 'tecnica',
-      estado: 'Enviada a CCB',
-      creada: new Date().toISOString(),
+      estado: App.Workflow.INITIAL,
+      creada: ahora,
+      actualizada: ahora,
+      actividad: [App.Workflow.activity('creada', user)],
       prioridad: val('prioridad'),
       titulo: val('tipoCambio') + ': ' + val('sistema'),
       fechaDeseada: val('fechaRequerida'),
@@ -460,6 +474,6 @@
     App.show('form');
   }
 
-  const Dev = { mount, navState, open };
+  const Dev = { mount, navState, open, buildSections };
   App.DevForm = Dev;
 })();

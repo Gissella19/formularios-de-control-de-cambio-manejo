@@ -1,6 +1,7 @@
 /* =====================================================================
    history.js — historial de solicitudes y vista de detalle.
    - Desarrollador: ve todas las solicitudes (técnicas y de usuarios).
+   - Comité CCB: ve todas y las gestiona (tablero tipo Jira o lista).
    - Usuario: ve solo las que él envió.
    - Buscador robusto: tolera tildes, mayúsculas, múltiples palabras y
      ofrece filtros independientes por Tipo y por Solicitante.
@@ -13,6 +14,7 @@
   let current = null;
   let activeUser = null;
   let allVisible = [];
+  let viewMode = 'board'; // 'board' | 'list' (el tablero solo existe para el comité)
 
   /* Normalización: minúsculas, sin tildes/diacríticos y sin espacios extra */
   function norm(str) {
@@ -91,6 +93,8 @@
 
     if (r.datos && r.datos.tipoCambio) parts.push(r.datos.tipoCambio);
     if (r.cambio && r.cambio.tipo) parts.push(r.cambio.tipo);
+    parts.push(App.Workflow.claseOf(r));
+    if (r.asignado && r.asignado.nombre) parts.push('asignado', r.asignado.nombre);
 
     // Solicitante y sinónimos
     parts.push('solicitante', 'responsable', 'autor');
@@ -118,13 +122,18 @@
     }
 
     if (r.titulo) parts.push(r.titulo);
-    if (r.estado) parts.push(r.estado);
+    parts.push(App.Workflow.normalize(r.estado));
 
     return parts.join(' ');
   }
 
   /* ---------- Criterio de filtrado reactivo ---------- */
-  function matchRecord(r, query, filterTipo, filterSol) {
+  function matchRecord(r, query, filterTipo, filterSol, filterEstado) {
+    // 0. Filtro Estado (select)
+    if (filterEstado && filterEstado !== 'todos') {
+      if (App.Workflow.normalize(r.estado) !== filterEstado) return false;
+    }
+
     // 1. Filtro Tipo (select)
     if (filterTipo && filterTipo !== 'todos') {
       if (r.tipo !== filterTipo) return false;
@@ -174,27 +183,31 @@
     const query = (searchInput ? searchInput.value : '').trim();
     const filterTipo = $('histFilterTipo') ? $('histFilterTipo').value : 'todos';
     const filterSol = $('histFilterSol') ? $('histFilterSol').value : 'todos';
+    const filterEstado = $('histFilterEstado') ? $('histFilterEstado').value : 'todos';
+    const board = viewMode === 'board' && activeUser.role === 'comite';
 
     const clearBtn = $('histSearchClear');
     if (clearBtn) clearBtn.hidden = !query;
 
-    const filtered = allVisible.filter((r) => matchRecord(r, query, filterTipo, filterSol));
+    const filtered = allVisible.filter((r) => matchRecord(r, query, filterTipo, filterSol, filterEstado));
 
     // Contador informativo
     const countEl = $('histCount');
     if (countEl) {
       if (allVisible.length === 0) {
         countEl.textContent = '';
-      } else if (!query && filterTipo === 'todos' && filterSol === 'todos') {
+      } else if (!query && filterTipo === 'todos' && filterSol === 'todos' && filterEstado === 'todos') {
         countEl.textContent = allVisible.length === 1 ? '1 solicitud' : allVisible.length + ' solicitudes';
       } else {
         countEl.textContent = filtered.length + ' de ' + allVisible.length + ' ' + (allVisible.length === 1 ? 'solicitud' : 'solicitudes');
       }
     }
 
-    const tableEl = $('histTable') || ($('histRows') ? $('histRows').closest('table') : null);
+    const tableEl = $('histScroll');
+    const boardEl = $('histBoard');
     const filterBar = $('histFilterBar');
     const emptyEl = $('histEmpty');
+    if (boardEl) boardEl.hidden = true;
 
     if (allVisible.length === 0) {
       if (filterBar) filterBar.hidden = true;
@@ -223,6 +236,7 @@
             if ($('histSearch')) $('histSearch').value = '';
             if ($('histFilterTipo')) $('histFilterTipo').value = 'todos';
             if ($('histFilterSol')) $('histFilterSol').value = 'todos';
+            if ($('histFilterEstado')) $('histFilterEstado').value = 'todos';
             updateView();
             if ($('histSearch')) $('histSearch').focus();
           });
@@ -234,6 +248,13 @@
 
     if (emptyEl) emptyEl.hidden = true;
 
+    if (board) {
+      if (tableEl) tableEl.hidden = true;
+      if (boardEl) { boardEl.hidden = false; App.Review.renderBoard(boardEl, filtered); }
+      return;
+    }
+    if (tableEl) tableEl.hidden = false;
+
     $('histRows').innerHTML = filtered
       .map((r) => {
         const sol = getSolicitante(r);
@@ -244,13 +265,15 @@
           '<tr>' +
           '<td><span class="mono hist-code">' + App.esc(r.id) + '</span></td>' +
           '<td><span class="hist-type-badge ' + tipoCls + '">' + tipoTxt + '</span></td>' +
-          '<td><div class="hist-cell-title">' + App.esc(r.titulo) + '</div></td>' +
+          '<td><div class="hist-cell-title">' + App.esc(r.titulo) + '</div>' +
+          (App.Workflow.claseOf(r) ? '<div class="hist-clase">' + App.claseBadge(App.Workflow.claseOf(r)) + '</div>' : '') +
+          '</td>' +
           '<td><div class="hist-sol-name">' + App.esc(sol) + '</div>' +
           (sub ? '<div class="hist-sol-sub">' + App.esc(sub) + '</div>' : '') +
           '</td>' +
           '<td>' + App.tag(r.prioridad) + '</td>' +
           '<td>' + App.esc(App.fmtDate(r.fechaDeseada)) + '</td>' +
-          '<td><span class="hist-status-pill">' + App.esc(r.estado) + '</span></td>' +
+          '<td>' + App.Workflow.pill(r.estado) + '</td>' +
           '<td><span class="hist-date-text">' + App.esc(App.fmtDateTime(r.creada)) + '</span></td>' +
           '<td style="text-align:center;"><button type="button" class="btn sec sm" data-ver="' + App.esc(r.id) + '">Ver</button></td>' +
           '</tr>'
@@ -261,11 +284,19 @@
 
   /* ---------- Render principal ---------- */
   function render(user) {
+    const comite = user.role === 'comite';
+    // Al cambiar de usuario se parte de la vista por defecto: tablero para el comité, lista para el resto.
+    if (!activeUser || activeUser.usuario !== user.usuario) viewMode = comite ? 'board' : 'list';
     activeUser = user;
-    const dev = user.role === 'desarrollador';
-    $('histLead').textContent = dev
-      ? 'Todas las solicitudes registradas en este navegador, técnicas y de usuarios.'
-      : 'Las solicitudes que ha enviado desde este navegador.';
+    $('histLead').textContent = comite
+      ? 'Solicitudes recibidas para su dictamen. Ábralas para aprobar, rechazar, pedir cambios o modificarlas; en el tablero puede arrastrar las tarjetas entre estados.'
+      : user.role === 'desarrollador'
+        ? 'Todas las solicitudes registradas en este navegador, técnicas y de usuarios.'
+        : 'Las solicitudes que ha enviado desde este navegador.';
+    $('histHeading').textContent = comite ? 'Gestión de solicitudes' : 'Historial de solicitudes';
+    $('btnHistNew').hidden = comite;
+    $('viewToggle').hidden = !comite;
+    syncToggle();
 
     // Encabezado con los campos solicitados
     $('histHead').innerHTML =
@@ -283,6 +314,30 @@
 
     allVisible = App.store.visibleFor(user).slice().sort((a, b) => String(b.creada).localeCompare(String(a.creada)));
     populateSolicitantes(allVisible);
+    populateEstados();
+    updateView();
+  }
+
+  function populateEstados() {
+    const sel = $('histFilterEstado');
+    if (!sel) return;
+    const cur = sel.value || 'todos';
+    sel.innerHTML =
+      '<option value="todos">Todos los estados</option>' +
+      App.Workflow.STATES.map((s) => '<option value="' + App.esc(s.id) + '">' + App.esc(s.id) + '</option>').join('');
+    sel.value = cur;
+    if (sel.value !== cur) sel.value = 'todos';
+  }
+
+  function syncToggle() {
+    const b = $('btnViewBoard'), l = $('btnViewList');
+    if (!b || !l) return;
+    b.setAttribute('aria-pressed', String(viewMode === 'board'));
+    l.setAttribute('aria-pressed', String(viewMode === 'list'));
+  }
+  function setMode(mode) {
+    viewMode = mode;
+    syncToggle();
     updateView();
   }
 
@@ -293,8 +348,12 @@
     $('detailMeta').textContent =
       (rec.tipo === 'tecnica' ? 'Solicitud técnica' : 'Solicitud de usuario') +
       (rec.autor ? ' de ' + rec.autor.nombre : '') + ' · enviada ' + App.fmtDateTime(rec.creada);
-    $('detailStatus').textContent = rec.estado.toUpperCase();
+    const estado = App.Workflow.normalize(rec.estado);
+    $('detailStatus').textContent = estado.toUpperCase();
+    $('detailStatus').classList.toggle('ok', estado === 'Aprobada' || estado === 'Implementada');
+    $('detailStatus').classList.toggle('bad', estado === 'Rechazada');
     $('detailBody').innerHTML = App.sectionsHTML(rec.secciones || [], false);
+    App.Review.renderDetail(rec, activeUser);
     App.show('detail');
   }
 
@@ -342,7 +401,13 @@
     if (filterSol) {
       filterSol.addEventListener('change', updateView);
     }
+
+    const filterEstado = $('histFilterEstado');
+    if (filterEstado) filterEstado.addEventListener('change', updateView);
+
+    $('btnViewBoard').addEventListener('click', () => setMode('board'));
+    $('btnViewList').addEventListener('click', () => setMode('list'));
   }
 
-  App.History = { init, render, detail, norm, getSolicitante, matchRecord };
+  App.History = { init, render, detail, norm, getSolicitante, getSolicitanteSub, matchRecord, refresh: () => render(activeUser) };
 })();

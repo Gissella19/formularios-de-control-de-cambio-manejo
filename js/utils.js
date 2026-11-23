@@ -8,6 +8,37 @@
 
   App.byId = (id) => document.getElementById(id);
 
+  /* ---------- Catálogos compartidos ---------- */
+  App.ROLE_LABEL = { desarrollador: 'Desarrollador', usuario: 'Usuario', comite: 'Comité CCB' };
+
+  /* Lista de departamentos de los formularios (editar aquí para cambiarla en todo el sistema). */
+  App.DEPARTAMENTOS = [
+    'Dirección de TI / Desarrollo',
+    'Infraestructura y Redes',
+    'Soporte Técnico',
+    'Seguridad de la Información',
+    'Calidad (QA) y Auditoría SCM',
+    'Ventas y Atención al Cliente',
+    'Operaciones',
+    'Finanzas y Contabilidad',
+    'Recursos Humanos',
+    'Marketing y Comunicación',
+    'Legal y Cumplimiento',
+    'Administración y Secretaría',
+  ];
+
+  /* Tipos de cambio (clasificación ITIL). */
+  App.TIPOS_CAMBIO = ['Normal', 'Estándar', 'Emergencia'];
+
+  /* Rellena un <select> conservando la opción vacía inicial. */
+  App.fillSelect = (sel, list) => {
+    if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = '<option value="">Seleccione…</option>' +
+      list.map((v) => '<option value="' + App.esc(v) + '">' + App.esc(v) + '</option>').join('');
+    if (keep && list.indexOf(keep) >= 0) sel.value = keep;
+  };
+
   App.esc = (s) =>
     String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -41,9 +72,17 @@
   };
   App.tag = (v) => '<span class="tag ' + App.tagClass(v) + '">' + App.esc(v) + '</span>';
 
+  /* Insignia del tipo de cambio: Normal | Estándar | Emergencia. */
+  App.claseBadge = (v) => {
+    if (!v) return '';
+    const s = String(v).toLowerCase();
+    const c = s.startsWith('eme') ? 'emergencia' : s.startsWith('est') ? 'estandar' : 'normal';
+    return '<span class="clase-badge ' + c + '">' + App.esc(v) + '</span>';
+  };
+
   /* ---------- Fichas (resumen estructurado por secciones) ----------
      sections: [{ titulo, filas: [[etiqueta, valor, formato?]] }]
-     formato: 'tag' | 'mono' | 'code' | 'long' */
+     formato: 'tag' | 'clase' | 'mono' | 'code' | 'long' */
   App.sectionsHTML = (sections, editable) =>
     sections
       .map((s, i) => {
@@ -60,6 +99,8 @@
               valHtml = '<span class="preview-empty">No especificado</span>';
             } else if (fmt === 'tag') {
               valHtml = App.tag(rawVal);
+            } else if (fmt === 'clase') {
+              valHtml = App.claseBadge(rawVal);
             } else if (fmt === 'code' || (fmt === 'mono' && String(rawVal).includes('\n'))) {
               valHtml = '<pre class="preview-code"><code>' + App.esc(rawVal) + '</code></pre>';
             } else if (fmt === 'mono') {

@@ -35,7 +35,7 @@
     return {
       nombre: { min: 3 },
       correo: { re: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, msg: 'Escriba un correo válido, por ejemplo nombre@empresa.com.' },
-      area: { min: 2 },
+      area: {},
       tel: { optional: true, re: /^(?=.*\d)[\w\s+().\/-]{3,}$/, msg: 'Escriba un teléfono o extensión válido, por ejemplo Ext. 4022 o 0991234567.' },
       titulo: { min: 5 },
       tipo: {},
@@ -56,6 +56,7 @@
     root.appendChild(App.byId('tpl-user-form').content.cloneNode(true));
     container.appendChild(root);
 
+    App.fillSelect(q('area'), App.DEPARTAMENTOS);
     form = q('userForm');
     panes = [].slice.call(form.querySelectorAll('.pane'));
     q('fecha').min = App.today();
@@ -145,7 +146,7 @@
 
   function fillExample() {
     q('titulo').value = 'Agregar botón de exportación a Excel en el listado de empleados';
-    q('area').value = q('area').value || 'Departamento de Recursos Humanos';
+    q('area').value = q('area').value || 'Recursos Humanos';
     q('tel').value = q('tel').value || 'Ext. 4022';
     q('tipo').selectedIndex = 1;
     q('categoria').selectedIndex = 1;
@@ -200,19 +201,33 @@
   }
 
   /* ---------- Envío ---------- */
-  function sections() {
+  /* Ficha a partir de una solicitud (también la usa el comité al editar). */
+  function buildSections(r) {
+    const s = r.solicitante || {}, c = r.cambio || {}, p = r.planificacion || {};
     return [
       { titulo: 'Sus datos personales y contacto', filas: [
-        ['Nombre completo', val('nombre')], ['Correo electrónico', val('correo')], ['Área o departamento', val('area')], ['Teléfono o extensión', val('tel')],
+        ['Nombre completo', s.nombre], ['Correo electrónico', s.correo], ['Área o departamento', s.area], ['Teléfono o extensión', s.telefono],
       ] },
       { titulo: 'Detalle del cambio solicitado', filas: [
-        ['Título corto', val('titulo')], ['Tipo de cambio', opt('tipo')], ['Categoría', opt('categoria')], ['Sistema o aplicación', val('sistema')],
-        ['Importancia', prio(), 'tag'], ['Fecha deseada', App.fmtDate(val('fecha'))],
-        ['Descripción', val('desc'), 'long'], ['Motivo / Beneficio', val('just'), 'long'],
-        ['Criterio de éxito', val('aceptacion'), 'long'], ['Referencia / Enlace', val('ref'), 'mono'],
+        ['Título corto', c.titulo], ['Tipo de cambio', c.tipo, 'clase'], ['Categoría', c.categoria], ['Sistema o aplicación', c.sistema],
+        ['Importancia', r.prioridad, 'tag'], ['Fecha deseada', App.fmtDate(p.fechaDeseada)],
+        ['Descripción', c.descripcion, 'long'], ['Motivo / Beneficio', c.justificacion, 'long'],
+        ['Criterio de éxito', p.criteriosAceptacion, 'long'], ['Referencia / Enlace', c.referencias, 'mono'],
       ] },
     ];
   }
+
+  /* Datos del formulario con la misma forma que una solicitud guardada. */
+  function formRecord() {
+    return {
+      prioridad: prio(),
+      solicitante: { nombre: val('nombre'), correo: val('correo'), area: val('area'), telefono: val('tel') },
+      cambio: { titulo: val('titulo'), tipo: opt('tipo'), categoria: opt('categoria'), sistema: val('sistema'),
+                descripcion: val('desc'), justificacion: val('just'), referencias: val('ref') },
+      planificacion: { fechaDeseada: val('fecha'), criteriosAceptacion: val('aceptacion') },
+    };
+  }
+  const sections = () => buildSections(formRecord());
 
   function enviar() {
     for (let i = 0; i < N - 1; i++) {
@@ -221,21 +236,19 @@
       App.toastError('No se pudo realizar el registro. Complete los campos requeridos en rojo.');
       return;
     }
-    const r = {
+    const ahora = new Date().toISOString();
+    const r = Object.assign(formRecord(), {
       id: App.store.nextId('RFC'),
       tipo: 'usuario',
-      estado: 'Recibida',
-      creada: new Date().toISOString(),
-      prioridad: prio(),
+      estado: App.Workflow.INITIAL,
+      creada: ahora,
+      actualizada: ahora,
+      actividad: [App.Workflow.activity('creada', user)],
       titulo: val('titulo'),
       fechaDeseada: val('fecha'),
       autor: { usuario: user.usuario, nombre: user.name, correo: user.email, rol: user.role },
-      solicitante: { nombre: val('nombre'), correo: val('correo'), area: val('area'), telefono: val('tel') },
-      cambio: { titulo: val('titulo'), tipo: opt('tipo'), categoria: opt('categoria'), sistema: val('sistema'),
-                descripcion: val('desc'), justificacion: val('just'), referencias: val('ref') },
-      planificacion: { fechaDeseada: val('fecha'), criteriosAceptacion: val('aceptacion') },
-      secciones: sections(),
-    };
+    });
+    r.secciones = buildSections(r);
     App.store.save(r);
     clearDraft();
     last = r;
@@ -314,6 +327,6 @@
     App.show('form');
   }
 
-  const User = { mount, navState, open };
+  const User = { mount, navState, open, buildSections };
   App.UserForm = User;
 })();

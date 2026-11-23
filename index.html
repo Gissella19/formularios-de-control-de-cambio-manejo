@@ -33,7 +33,7 @@
         <button class="btn block" type="submit">Ingresar</button>
         <p class="demo">
           Cuentas de prueba: <b>dev</b> / dev123 (desarrollador) ·
-          <b>usuario</b> / user123
+          <b>usuario</b> / user123 · <b>comite</b> / comite123 (comité CCB)
         </p>
       </form>
     </main>
@@ -85,8 +85,12 @@
           </div>
           <div class="head">
             <div>
-              <h2>Historial de solicitudes</h2>
+              <h2 id="histHeading">Historial de solicitudes</h2>
               <p class="lead" id="histLead"></p>
+            </div>
+            <div class="view-toggle" id="viewToggle" role="group" aria-label="Tipo de vista" hidden>
+              <button type="button" id="btnViewBoard" aria-pressed="true">Tablero</button>
+              <button type="button" id="btnViewList" aria-pressed="false">Lista</button>
             </div>
           </div>
           <!-- Barra de búsqueda y filtros -->
@@ -122,9 +126,15 @@
                 <option value="todos">Todos los solicitantes</option>
               </select>
             </div>
+            <div class="hist-filter-select-wrap">
+              <select id="histFilterEstado" class="hist-filter-select" aria-label="Filtrar por estado">
+                <option value="todos">Todos los estados</option>
+              </select>
+            </div>
             <div class="hist-count-badge" id="histCount" aria-live="polite"></div>
           </div>
-          <div class="scroll">
+          <div class="board" id="histBoard" aria-label="Tablero de solicitudes" hidden></div>
+          <div class="scroll" id="histScroll">
             <table id="histTable">
               <thead id="histHead"></thead>
               <tbody id="histRows"></tbody>
@@ -149,37 +159,43 @@
               Imprimir / Guardar PDF
             </button>
           </div>
-          <div class="print-doc-header">
-            <div class="print-doc-brand">
-              UNIVERSIDAD TÉCNICA DE AMBATO · FISEI · SCM
-            </div>
-            <h2 id="detailTitle" class="detail-title"></h2>
-            <p class="lead" id="detailMeta"></p>
-          </div>
-          <span class="status ok" id="detailStatus"></span>
-          <div id="detailBody"></div>
-          <div class="print-signatures">
-            <div class="print-sig-col">
-              <div class="print-sig-line"></div>
-              <div class="print-sig-role">Desarrollador Responsable</div>
-              <div class="print-sig-sub">Firma del Solicitante</div>
-            </div>
-            <div class="print-sig-col">
-              <div class="print-sig-line"></div>
-              <div class="print-sig-role">Lead Reviewer / Auditor SCM</div>
-              <div class="print-sig-sub">Revisión Técnica y QA</div>
-            </div>
-            <div class="print-sig-col">
-              <div class="print-sig-line"></div>
-              <div class="print-sig-role">Comité CCB (Dictamen)</div>
-              <div class="print-sig-sub">
-                [ &nbsp; ] Aprobado &nbsp;&nbsp; [ &nbsp; ] Rechazado
+          <div class="detail-layout">
+            <div class="detail-main">
+              <div class="print-doc-header">
+                <div class="print-doc-brand">
+                  UNIVERSIDAD TÉCNICA DE AMBATO · FISEI · SCM
+                </div>
+                <h2 id="detailTitle" class="detail-title"></h2>
+                <p class="lead" id="detailMeta"></p>
               </div>
+              <span class="status ok" id="detailStatus"></span>
+              <div id="detailBody"></div>
+              <div class="print-signatures">
+                <div class="print-sig-col">
+                  <div class="print-sig-line"></div>
+                  <div class="print-sig-role">Desarrollador Responsable</div>
+                  <div class="print-sig-sub">Firma del Solicitante</div>
+                </div>
+                <div class="print-sig-col">
+                  <div class="print-sig-line"></div>
+                  <div class="print-sig-role">Lead Reviewer / Auditor SCM</div>
+                  <div class="print-sig-sub">Revisión Técnica y QA</div>
+                </div>
+                <div class="print-sig-col">
+                  <div class="print-sig-line"></div>
+                  <div class="print-sig-role">Comité CCB (Dictamen)</div>
+                  <div class="print-sig-sub" id="detailDictamen">
+                    [ &nbsp; ] Aprobado &nbsp;&nbsp; [ &nbsp; ] Rechazado
+                  </div>
+                </div>
+              </div>
+              <div class="print-doc-footer">
+                Documento técnico de control de cambios emitido conforme a la
+                norma IEEE 828 · FISEI · Universidad Técnica de Ambato
+              </div>
+              <section class="activity" id="detailActivity" aria-label="Actividad de la solicitud"></section>
             </div>
-          </div>
-          <div class="print-doc-footer">
-            Documento técnico de control de cambios emitido conforme a la norma
-            IEEE 828 · FISEI · Universidad Técnica de Ambato
+            <aside class="detail-side" id="detailSide" aria-label="Gestión de la solicitud"></aside>
           </div>
         </div>
       </section>
@@ -208,6 +224,50 @@
         <p id="modalText"></p>
         <div class="modal-actions" id="modalActions"></div>
       </div>
+    </div>
+
+    <!-- Diálogo de decisión del comité (cambio de estado con comentario) -->
+    <div
+      id="decisionModal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="decTitle"
+      hidden
+    >
+      <form class="modal modal-form" id="decisionForm" novalidate>
+        <h3 id="decTitle"></h3>
+        <p id="decText"></p>
+        <div class="f">
+          <label class="l" id="decLabel" for="decComment">Comentario</label>
+          <textarea id="decComment"></textarea>
+          <div class="msg" id="decErr" role="alert" hidden></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn sec" id="decCancel">Cancelar</button>
+          <button type="submit" class="btn" id="decOk">Confirmar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Diálogo de edición de la solicitud (comité) -->
+    <div
+      id="editModal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="editTitle"
+      hidden
+    >
+      <form class="modal modal-form modal-wide" id="editForm" novalidate autocomplete="off">
+        <h3 id="editTitle">Modificar solicitud</h3>
+        <p id="editText"></p>
+        <div class="grid" id="editFields"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn sec" id="editCancel">Cancelar</button>
+          <button type="submit" class="btn">Guardar cambios</button>
+        </div>
+      </form>
     </div>
 
     <!-- ============================ PLANTILLA: FORMULARIO DESARROLLADOR ============================ -->
@@ -285,11 +345,10 @@
               />
             </div>
             <div class="f">
-              <label class="l req" for="departamento">Departamento / Área</label
-              ><input
-                id="departamento"
-                placeholder="Ej: Dirección de TI/Desarrollo"
-              />
+              <label class="l req" for="departamento">Departamento / Área</label>
+              <select id="departamento">
+                <option value="">Seleccione…</option>
+              </select>
             </div>
           </div>
 
@@ -340,7 +399,16 @@
               ><input id="sistema" placeholder="Ej: Módulo de Autenticación" />
             </div>
             <div class="f">
-              <label class="l req" for="tipoCambio">Tipo de cambio</label>
+              <label class="l req" for="claseCambio">Tipo de cambio</label>
+              <select id="claseCambio">
+                <option value="">Seleccione…</option>
+                <option value="Normal">Normal</option>
+                <option value="Estándar">Estándar</option>
+                <option value="Emergencia">Emergencia</option>
+              </select>
+            </div>
+            <div class="f">
+              <label class="l req" for="tipoCambio">Naturaleza del cambio</label>
               <select id="tipoCambio">
                 <option value="">Seleccione…</option>
                 <option>Correctivo</option>
@@ -591,11 +659,10 @@
               />
             </div>
             <div class="f">
-              <label class="l req" for="area">Área o departamento</label
-              ><input
-                id="area"
-                placeholder="Ej: Departamento de Recursos Humanos"
-              />
+              <label class="l req" for="area">Área o departamento</label>
+              <select id="area">
+                <option value="">Seleccione…</option>
+              </select>
             </div>
           </div>
 
@@ -807,8 +874,10 @@
 
     <script src="js/utils.js"></script>
     <script src="js/store.js"></script>
+    <script src="js/workflow.js"></script>
     <script src="js/validator.js"></script>
     <script src="js/history.js"></script>
+    <script src="js/review.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/dev-form.js"></script>
     <script src="js/user-form.js"></script>

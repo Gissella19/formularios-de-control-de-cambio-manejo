@@ -4,6 +4,7 @@
    Roles:
      desarrollador → formulario técnico (CR) + historial de todas las solicitudes
      usuario       → formulario de usuario + historial de sus solicitudes
+     comite        → gestión y aprobación de todas las solicitudes (sin formulario)
    ===================================================================== */
 (function () {
   'use strict';
@@ -14,7 +15,7 @@
   App.form = null;       // módulo de formulario activo (DevForm | UserForm)
   App.view = 'login';    // 'login' | 'form' | 'hist' | 'detail'
 
-  const ROLE_LABEL = { desarrollador: 'Desarrollador', usuario: 'Usuario' };
+  const ROLE_LABEL = App.ROLE_LABEL;
   const VIEWS = ['form', 'hist', 'detail'];
 
   /* ---------- Cambio de vista ---------- */
@@ -26,6 +27,7 @@
     appView.classList.toggle('layout-form', isForm);
     appView.classList.toggle('layout-hist', name === 'hist');
     appView.classList.toggle('layout-detail', name === 'detail');
+    appView.classList.toggle('layout-comite', !!App.user && App.user.role === 'comite');
     if ($('app-sidebar')) $('app-sidebar').hidden = !isForm;
     App.renderNav();
     App.top();
@@ -37,7 +39,7 @@
   };
 
   App.newRequest = function () {
-    App.form.open();
+    if (App.form) App.form.open();
   };
 
   /* ---------- Stepper horizontal ---------- */
@@ -109,9 +111,10 @@
     if ($('whoRole')) $('whoRole').textContent = roleTxt;
     if ($('formRoleBadge')) $('formRoleBadge').textContent = roleTxt;
     if ($('histRoleBadge')) $('histRoleBadge').textContent = roleTxt;
-    App.form = user.role === 'desarrollador' ? App.DevForm : App.UserForm;
+    // El comité no crea solicitudes: solo las gestiona.
+    App.form = user.role === 'desarrollador' ? App.DevForm : user.role === 'usuario' ? App.UserForm : null;
     const mountPoint = $('form-mount-point') || $('view-form');
-    App.form.mount(mountPoint, user);
+    if (App.form) App.form.mount(mountPoint, user);
     App.openHistory();
   };
 
@@ -132,6 +135,7 @@
   function init() {
     App.Auth.init();
     App.History.init();
+    App.Review.init();
     if ($('btnLogout')) $('btnLogout').addEventListener('click', App.logout);
     if ($('btnLogoutHist')) $('btnLogoutHist').addEventListener('click', App.logout);
     if ($('btnLogoutForm')) $('btnLogoutForm').addEventListener('click', App.logout);
