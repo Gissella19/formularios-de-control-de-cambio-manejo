@@ -10,7 +10,7 @@
   const App = (window.App = window.App || {});
 
   const STEPS = [{ title: 'Sus datos' }, { title: 'El cambio' }, { title: 'Revisar y enviar' }];
-  const DRAFT_FIELDS = ['nombre', 'correo', 'area', 'tel', 'titulo', 'tipo', 'categoria', 'sistema', 'desc', 'just', 'fecha', 'aceptacion', 'ref'];
+  const DRAFT_FIELDS = ['nombre', 'correo', 'area', 'tel', 'titulo', 'tipo', 'categoria', 'sistema', 'desc', 'just', 'fecha', 'aceptacion'];
   const DRAFT_KEY = 'rfc-draft-user';
   const N = STEPS.length;
   const STEP_FIELDS = [
@@ -212,7 +212,7 @@
         ['Título corto', c.titulo], ['Tipo de cambio', c.tipo, 'clase'], ['Categoría', c.categoria], ['Sistema o aplicación', c.sistema],
         ['Importancia', r.prioridad, 'tag'], ['Fecha deseada', App.fmtDate(p.fechaDeseada)],
         ['Descripción', c.descripcion, 'long'], ['Motivo / Beneficio', c.justificacion, 'long'],
-        ['Criterio de éxito', p.criteriosAceptacion, 'long'], ['Referencia / Enlace', c.referencias, 'mono'],
+        ['Criterio de éxito', p.criteriosAceptacion, 'long'],
       ] },
     ];
   }
@@ -223,7 +223,7 @@
       prioridad: prio(),
       solicitante: { nombre: val('nombre'), correo: val('correo'), area: val('area'), telefono: val('tel') },
       cambio: { titulo: val('titulo'), tipo: opt('tipo'), categoria: opt('categoria'), sistema: val('sistema'),
-                descripcion: val('desc'), justificacion: val('just'), referencias: val('ref') },
+                descripcion: val('desc'), justificacion: val('just') },
       planificacion: { fechaDeseada: val('fecha'), criteriosAceptacion: val('aceptacion') },
     };
   }

@@ -33,7 +33,10 @@
         <button class="btn block" type="submit">Ingresar</button>
         <p class="demo">
           Cuentas de prueba: <b>dev</b> / dev123 (desarrollador) ·
-          <b>usuario</b> / user123 · <b>comite</b> / comite123 (comité CCB)
+          <b>dev2</b> / dev123 · <b>usuario</b> / user123 ·
+          <b>comite</b> / comite123 (presidente del comité) ·
+          <b>gisselle</b> / gisselle123 · <b>diego</b> / diego123 ·
+          <b>fernando</b> / fernando123 (miembros)
         </p>
       </form>
     </main>
@@ -88,6 +91,14 @@
               <h2 id="histHeading">Historial de solicitudes</h2>
               <p class="lead" id="histLead"></p>
             </div>
+            <div class="view-toggle" id="scopeToggle" role="group" aria-label="Qué solicitudes mostrar" hidden>
+              <button type="button" id="btnScopeMine" aria-pressed="true">
+                Mis solicitudes <span class="scope-count" id="cntMine"></span>
+              </button>
+              <button type="button" id="btnScopeAssigned" aria-pressed="false">
+                Asignadas a mí <span class="scope-count" id="cntAssigned"></span>
+              </button>
+            </div>
             <div class="view-toggle" id="viewToggle" role="group" aria-label="Tipo de vista" hidden>
               <button type="button" id="btnViewBoard" aria-pressed="true">Tablero</button>
               <button type="button" id="btnViewList" aria-pressed="false">Lista</button>
@@ -124,6 +135,11 @@
             <div class="hist-filter-select-wrap">
               <select id="histFilterSol" class="hist-filter-select" aria-label="Filtrar por solicitante">
                 <option value="todos">Todos los solicitantes</option>
+              </select>
+            </div>
+            <div class="hist-filter-select-wrap" id="histRevWrap" hidden>
+              <select id="histFilterRev" class="hist-filter-select" aria-label="Filtrar por revisor">
+                <option value="todos">Todos los revisores</option>
               </select>
             </div>
             <div class="hist-filter-select-wrap">
@@ -170,29 +186,7 @@
               </div>
               <span class="status ok" id="detailStatus"></span>
               <div id="detailBody"></div>
-              <div class="print-signatures">
-                <div class="print-sig-col">
-                  <div class="print-sig-line"></div>
-                  <div class="print-sig-role">Desarrollador Responsable</div>
-                  <div class="print-sig-sub">Firma del Solicitante</div>
-                </div>
-                <div class="print-sig-col">
-                  <div class="print-sig-line"></div>
-                  <div class="print-sig-role">Lead Reviewer / Auditor SCM</div>
-                  <div class="print-sig-sub">Revisión Técnica y QA</div>
-                </div>
-                <div class="print-sig-col">
-                  <div class="print-sig-line"></div>
-                  <div class="print-sig-role">Comité CCB (Dictamen)</div>
-                  <div class="print-sig-sub" id="detailDictamen">
-                    [ &nbsp; ] Aprobado &nbsp;&nbsp; [ &nbsp; ] Rechazado
-                  </div>
-                </div>
-              </div>
-              <div class="print-doc-footer">
-                Documento técnico de control de cambios emitido conforme a la
-                norma IEEE 828 · FISEI · Universidad Técnica de Ambato
-              </div>
+              <section class="activity impl-log" id="detailImpl" aria-label="Bitácora de implementación" hidden></section>
               <section class="activity" id="detailActivity" aria-label="Actividad de la solicitud"></section>
             </div>
             <aside class="detail-side" id="detailSide" aria-label="Gestión de la solicitud"></aside>
@@ -476,13 +470,51 @@
               ></textarea>
             </div>
           </div>
+
+          <div class="subhead">Planes de ejecución</div>
+          <div class="grid">
+            <div class="f full">
+              <div class="field-header">
+                <label class="l req" for="rollout">Plan de Rollout (despliegue)</label>
+                <span class="char-counter" data-for="rollout" data-min="30"
+                  ><span class="cnt">0</span>/30 mín.</span
+                >
+              </div>
+              <p class="hint">
+                Cómo se pondrá el cambio en producción: pasos, ventana de
+                despliegue, responsables y validación posterior.
+              </p>
+              <textarea
+                id="rollout"
+                class="mono"
+                placeholder="Ej: 1. Ventana de despliegue: sábado 22:00-23:00&#10;2. Respaldar la base de datos&#10;3. Desplegar la versión v2.4.0 en el clúster (rolling update)&#10;4. Ejecutar pruebas de humo y validar el login SSO&#10;5. Notificar al equipo de soporte"
+              ></textarea>
+            </div>
+            <div class="f full">
+              <div class="field-header">
+                <label class="l req" for="rollback">Plan de Backout (reversión)</label>
+                <span class="char-counter" data-for="rollback" data-min="30"
+                  ><span class="cnt">0</span>/30 mín.</span
+                >
+              </div>
+              <p class="hint">
+                Cómo se deshace el cambio si falla: cuándo se activa, pasos
+                para revertir y tiempo estimado.
+              </p>
+              <textarea
+                id="rollback"
+                class="mono"
+                placeholder="Ej: Se activa si falla el login o hay errores HTTP 500 sostenidos.&#10;1. git revert -m 1 &lt;hash_del_commit&gt;&#10;2. Ejecutar rollback de base de datos: npm run db:rollback&#10;3. Re-desplegar la versión v2.3.9 en el clúster&#10;4. Verificar logs de monitoreo en Graylog"
+              ></textarea>
+            </div>
+          </div>
         </section>
 
         <!-- Fase 3 -->
         <section class="pane" hidden>
-          <h2>Riesgo, pruebas y plan de reversión</h2>
+          <h2>Riesgo y pruebas</h2>
           <p class="lead">
-            Cómo se validó el cambio y cómo se revierte si falla.
+            Qué tan riesgoso es el cambio y cómo se validó.
           </p>
 
           <div class="subhead">Evaluación de impacto</div>
@@ -510,7 +542,7 @@
             </div>
           </div>
 
-          <div class="subhead">Estrategia de validación y contingencia</div>
+          <div class="subhead">Estrategia de validación</div>
           <div class="grid">
             <div class="f full">
               <div class="field-header">
@@ -522,21 +554,6 @@
               <textarea
                 id="pruebas"
                 placeholder="Ej: Pruebas unitarias ejecutadas con Jest (cobertura 92%). Superadas pruebas de integración..."
-              ></textarea>
-            </div>
-            <div class="f full">
-              <div class="field-header">
-                <label class="l req" for="rollback"
-                  >Plan de reversión (rollback)</label
-                >
-                <span class="char-counter" data-for="rollback" data-min="20"
-                  ><span class="cnt">0</span>/20 mín.</span
-                >
-              </div>
-              <textarea
-                id="rollback"
-                class="mono"
-                placeholder="Ej: 1. git revert -m 1 &lt;hash_del_commit&gt;&#10;2. Ejecutar rollback de base de datos: npm run db:rollback&#10;3. Re-desplegar la versión v2.3.9 en el clúster&#10;4. Verificar logs de monitoreo en Graylog"
               ></textarea>
             </div>
           </div>
@@ -568,29 +585,6 @@
         </div>
         <span class="status" id="devBadge"></span>
         <div id="devSummary"></div>
-        <div class="print-signatures">
-          <div class="print-sig-col">
-            <div class="print-sig-line"></div>
-            <div class="print-sig-role">Desarrollador Responsable</div>
-            <div class="print-sig-sub">Firma del Solicitante</div>
-          </div>
-          <div class="print-sig-col">
-            <div class="print-sig-line"></div>
-            <div class="print-sig-role">Lead Reviewer / Auditor SCM</div>
-            <div class="print-sig-sub">Revisión Técnica y QA</div>
-          </div>
-          <div class="print-sig-col">
-            <div class="print-sig-line"></div>
-            <div class="print-sig-role">Comité CCB (Dictamen)</div>
-            <div class="print-sig-sub">
-              [ &nbsp; ] Aprobado &nbsp;&nbsp; [ &nbsp; ] Rechazado
-            </div>
-          </div>
-        </div>
-        <div class="print-doc-footer">
-          Documento técnico de control de cambios emitido conforme a la norma
-          IEEE 828 · FISEI · Universidad Técnica de Ambato
-        </div>
         <div class="actions" id="devPreActions">
           <button type="button" class="btn" data-act="send">
             Validar y Enviar Solicitud al CCB
@@ -809,7 +803,7 @@
             </div>
           </div>
 
-          <div class="subhead">Cierre y referencias (opcional)</div>
+          <div class="subhead">Cierre (opcional)</div>
           <div class="grid">
             <div class="f full">
               <label class="l" for="aceptacion"
@@ -818,13 +812,6 @@
                 id="aceptacion"
                 placeholder="Ej: Al pulsar el botón 'Exportar Excel', se descarga el archivo con todas las columnas y abre sin errores en Excel."
               ></textarea>
-            </div>
-            <div class="f full">
-              <label class="l" for="ref">Enlace o referencia</label
-              ><input
-                id="ref"
-                placeholder="Ej: Ticket de soporte #3482 o URL de la intranet"
-              />
             </div>
           </div>
         </section>
@@ -878,6 +865,8 @@
     <script src="js/validator.js"></script>
     <script src="js/history.js"></script>
     <script src="js/review.js"></script>
+    <script src="js/git-branch.js"></script>
+    <script src="js/impl.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/dev-form.js"></script>
     <script src="js/user-form.js"></script>

@@ -1,6 +1,7 @@
 /* =====================================================================
    history.js — historial de solicitudes y vista de detalle.
-   - Desarrollador: ve todas las solicitudes (técnicas y de usuarios).
+   - Desarrollador: dos listas: «Mis solicitudes» (las que creó) y
+     «Asignadas a mí» (las que el comité le encargó implementar).
    - Comité CCB: ve todas y las gestiona (tablero tipo Jira o lista).
    - Usuario: ve solo las que él envió.
    - Buscador robusto: tolera tildes, mayúsculas, múltiples palabras y
@@ -15,6 +16,7 @@
   let activeUser = null;
   let allVisible = [];
   let viewMode = 'board'; // 'board' | 'list' (el tablero solo existe para el comité)
+  let scope = 'mias';     // 'mias' | 'asignadas' (solo desarrolladores)
 
   /* Normalización: minúsculas, sin tildes/diacríticos y sin espacios extra */
   function norm(str) {
@@ -95,6 +97,8 @@
     if (r.cambio && r.cambio.tipo) parts.push(r.cambio.tipo);
     parts.push(App.Workflow.claseOf(r));
     if (r.asignado && r.asignado.nombre) parts.push('asignado', r.asignado.nombre);
+    if (r.implementador && r.implementador.nombre) parts.push('implementador', r.implementador.nombre);
+    if (r.git) parts.push(r.git.rama, r.git.repositorio);
 
     // Solicitante y sinónimos
     parts.push('solicitante', 'responsable', 'autor');
@@ -128,7 +132,15 @@
   }
 
   /* ---------- Criterio de filtrado reactivo ---------- */
-  function matchRecord(r, query, filterTipo, filterSol, filterEstado) {
+  function matchRecord(r, query, filterTipo, filterSol, filterEstado, filterRev) {
+    // Revisor asignado (solo comité): 'mias' | 'sin' | usuario
+    if (filterRev && filterRev !== 'todos') {
+      const u = r.asignado && r.asignado.usuario;
+      if (filterRev === 'sin') { if (u) return false; }
+      else if (filterRev === 'mias') { if (!activeUser || u !== activeUser.usuario) return false; }
+      else if (u !== filterRev) return false;
+    }
+
     // 0. Filtro Estado (select)
     if (filterEstado && filterEstado !== 'todos') {
       if (App.Workflow.normalize(r.estado) !== filterEstado) return false;
@@ -184,19 +196,20 @@
     const filterTipo = $('histFilterTipo') ? $('histFilterTipo').value : 'todos';
     const filterSol = $('histFilterSol') ? $('histFilterSol').value : 'todos';
     const filterEstado = $('histFilterEstado') ? $('histFilterEstado').value : 'todos';
+    const filterRev = activeUser.role === 'comite' && $('histFilterRev') ? $('histFilterRev').value : 'todos';
     const board = viewMode === 'board' && activeUser.role === 'comite';
 
     const clearBtn = $('histSearchClear');
     if (clearBtn) clearBtn.hidden = !query;
 
-    const filtered = allVisible.filter((r) => matchRecord(r, query, filterTipo, filterSol, filterEstado));
+    const filtered = allVisible.filter((r) => matchRecord(r, query, filterTipo, filterSol, filterEstado, filterRev));
 
     // Contador informativo
     const countEl = $('histCount');
     if (countEl) {
       if (allVisible.length === 0) {
         countEl.textContent = '';
-      } else if (!query && filterTipo === 'todos' && filterSol === 'todos' && filterEstado === 'todos') {
+      } else if (!query && filterTipo === 'todos' && filterSol === 'todos' && filterEstado === 'todos' && filterRev === 'todos') {
         countEl.textContent = allVisible.length === 1 ? '1 solicitud' : allVisible.length + ' solicitudes';
       } else {
         countEl.textContent = filtered.length + ' de ' + allVisible.length + ' ' + (allVisible.length === 1 ? 'solicitud' : 'solicitudes');
@@ -207,14 +220,17 @@
     const boardEl = $('histBoard');
     const filterBar = $('histFilterBar');
     const emptyEl = $('histEmpty');
-    if (boardEl) boardEl.hidden = true;
+    if (boardEl) { boardEl.hidden = true; boardEl.innerHTML = ''; }
 
     if (allVisible.length === 0) {
+      $('histRows').innerHTML = '';
       if (filterBar) filterBar.hidden = true;
       if (tableEl) tableEl.hidden = true;
       if (emptyEl) {
         emptyEl.hidden = false;
-        emptyEl.innerHTML = 'Aún no hay solicitudes registradas.';
+        emptyEl.innerHTML = activeUser.role === 'desarrollador' && scope === 'asignadas'
+          ? 'Aún no tiene solicitudes asignadas. Aparecerán aquí cuando el comité apruebe una y le asigne la implementación.'
+          : 'Aún no hay solicitudes registradas.';
       }
       return;
     }
@@ -237,6 +253,7 @@
             if ($('histFilterTipo')) $('histFilterTipo').value = 'todos';
             if ($('histFilterSol')) $('histFilterSol').value = 'todos';
             if ($('histFilterEstado')) $('histFilterEstado').value = 'todos';
+            if ($('histFilterRev')) $('histFilterRev').value = 'todos';
             updateView();
             if ($('histSearch')) $('histSearch').focus();
           });
@@ -267,6 +284,7 @@
           '<td><span class="hist-type-badge ' + tipoCls + '">' + tipoTxt + '</span></td>' +
           '<td><div class="hist-cell-title">' + App.esc(r.titulo) + '</div>' +
           (App.Workflow.claseOf(r) ? '<div class="hist-clase">' + App.claseBadge(App.Workflow.claseOf(r)) + '</div>' : '') +
+          (r.git && r.git.rama ? '<div class="hist-branch mono" title="Rama de trabajo">⎇ ' + App.esc(r.git.rama) + '</div>' : '') +
           '</td>' +
           '<td><div class="hist-sol-name">' + App.esc(sol) + '</div>' +
           (sub ? '<div class="hist-sol-sub">' + App.esc(sub) + '</div>' : '') +
@@ -286,16 +304,21 @@
   function render(user) {
     const comite = user.role === 'comite';
     // Al cambiar de usuario se parte de la vista por defecto: tablero para el comité, lista para el resto.
-    if (!activeUser || activeUser.usuario !== user.usuario) viewMode = comite ? 'board' : 'list';
+    const dev = user.role === 'desarrollador';
+    if (!activeUser || activeUser.usuario !== user.usuario) { viewMode = comite ? 'board' : 'list'; scope = 'mias'; }
     activeUser = user;
+    const asignadas = dev && scope === 'asignadas';
     $('histLead').textContent = comite
       ? 'Solicitudes recibidas para su dictamen. Ábralas para aprobar, rechazar, pedir cambios o modificarlas; en el tablero puede arrastrar las tarjetas entre estados.'
-      : user.role === 'desarrollador'
-        ? 'Todas las solicitudes registradas en este navegador, técnicas y de usuarios.'
-        : 'Las solicitudes que ha enviado desde este navegador.';
-    $('histHeading').textContent = comite ? 'Gestión de solicitudes' : 'Historial de solicitudes';
+      : asignadas
+        ? 'Solicitudes aprobadas que el comité le asignó para implementar.'
+        : dev
+          ? 'Las solicitudes que usted creó desde este navegador.'
+          : 'Las solicitudes que ha enviado desde este navegador.';
+    $('histHeading').textContent = comite ? 'Gestión de solicitudes' : asignadas ? 'Asignadas a mí' : dev ? 'Mis solicitudes' : 'Historial de solicitudes';
     $('btnHistNew').hidden = comite;
     $('viewToggle').hidden = !comite;
+    $('scopeToggle').hidden = !dev;
     syncToggle();
 
     // Encabezado con los campos solicitados
@@ -312,10 +335,32 @@
       '<th scope="col" style="width:80px; text-align:center;">Acción</th>' +
       '</tr>';
 
-    allVisible = App.store.visibleFor(user).slice().sort((a, b) => String(b.creada).localeCompare(String(a.creada)));
+    const bySize = (a, b) => String(b.creada).localeCompare(String(a.creada));
+    if (dev) {
+      $('cntMine').textContent = App.store.mine(user).length;
+      $('cntAssigned').textContent = App.store.assignedTo(user).length;
+    }
+    allVisible = (dev ? (asignadas ? App.store.assignedTo(user) : App.store.mine(user)) : App.store.visibleFor(user))
+      .slice().sort(bySize);
     populateSolicitantes(allVisible);
     populateEstados();
+    populateRevisores(comite);
     updateView();
+  }
+
+  function populateRevisores(comite) {
+    const wrap = $('histRevWrap'), sel = $('histFilterRev');
+    if (!wrap || !sel) return;
+    wrap.hidden = !comite;
+    if (!comite) { sel.value = 'todos'; return; }
+    const cur = sel.value || 'todos';
+    sel.innerHTML =
+      '<option value="todos">Todos los revisores</option>' +
+      '<option value="mias">Asignadas a mí</option>' +
+      '<option value="sin">Sin revisor</option>' +
+      App.store.committeeMembers().map((m) => '<option value="' + App.esc(m.usuario) + '">' + App.esc(m.nombre) + '</option>').join('');
+    sel.value = cur;
+    if (sel.value !== cur) sel.value = 'todos';
   }
 
   function populateEstados() {
@@ -334,6 +379,12 @@
     if (!b || !l) return;
     b.setAttribute('aria-pressed', String(viewMode === 'board'));
     l.setAttribute('aria-pressed', String(viewMode === 'list'));
+    $('btnScopeMine').setAttribute('aria-pressed', String(scope === 'mias'));
+    $('btnScopeAssigned').setAttribute('aria-pressed', String(scope === 'asignadas'));
+  }
+  function setScope(s) {
+    scope = s;
+    if (activeUser) render(activeUser);
   }
   function setMode(mode) {
     viewMode = mode;
@@ -404,9 +455,12 @@
 
     const filterEstado = $('histFilterEstado');
     if (filterEstado) filterEstado.addEventListener('change', updateView);
+    if ($('histFilterRev')) $('histFilterRev').addEventListener('change', updateView);
 
     $('btnViewBoard').addEventListener('click', () => setMode('board'));
     $('btnViewList').addEventListener('click', () => setMode('list'));
+    $('btnScopeMine').addEventListener('click', () => setScope('mias'));
+    $('btnScopeAssigned').addEventListener('click', () => setScope('asignadas'));
   }
 
   App.History = { init, render, detail, norm, getSolicitante, getSolicitanteSub, matchRecord, refresh: () => render(activeUser) };
