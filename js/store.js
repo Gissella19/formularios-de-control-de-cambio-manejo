@@ -15,8 +15,12 @@
 
   const USERS = [
     { user: 'dev', pass: 'dev123', role: 'desarrollador', name: 'Desarrollador Demo', email: 'dev@empresa.com' },
+    { user: 'dev2', pass: 'dev123', role: 'desarrollador', name: 'Desarrollador Dos', email: 'dev2@empresa.com' },
     { user: 'usuario', pass: 'user123', role: 'usuario', name: 'Usuario Demo', email: 'usuario@empresa.com' },
-    { user: 'comite', pass: 'comite123', role: 'comite', name: 'Comité CCB', email: 'comite@empresa.com' },
+    { user: 'comite', pass: 'comite123', role: 'comite', name: 'Comité CCB', email: 'comite@empresa.com', cargo: 'Presidente del comité', superadmin: true },
+    { user: 'gisselle', pass: 'gisselle123', role: 'comite', name: 'Gisselle', email: 'gisselle@empresa.com', cargo: 'Miembro del comité' },
+    { user: 'diego', pass: 'diego123', role: 'comite', name: 'Diego', email: 'diego@empresa.com', cargo: 'Miembro del comité' },
+    { user: 'fernando', pass: 'fernando123', role: 'comite', name: 'Fernando', email: 'fernando@empresa.com', cargo: 'Miembro del comité' },
   ];
 
   function area(kind) {
@@ -35,7 +39,7 @@
     try { const st = area('local'); if (st) st.setItem(KEY_REQ, JSON.stringify(list)); } catch (e) { /* solo memoria */ }
   }
   function publicUser(u) {
-    return { usuario: u.user, role: u.role, name: u.name, email: u.email };
+    return { usuario: u.user, role: u.role, name: u.name, email: u.email, cargo: u.cargo || '', superadmin: !!u.superadmin };
   }
 
   App.store = {
@@ -61,10 +65,30 @@
 
     /* ---- Solicitudes ---- */
     all: () => readReq(),
-    /* El desarrollador y el comité ven todas; el usuario solo las suyas. */
+    /* Solicitudes creadas por el usuario. */
+    mine(user) {
+      return readReq().filter((r) => r.autor && r.autor.usuario === user.usuario);
+    },
+    /* Solicitudes que el comité asignó a este desarrollador para implementarlas. */
+    assignedTo(user) {
+      return readReq().filter((r) => r.implementador && r.implementador.usuario === user.usuario);
+    },
+    /* El comité ve todas; el usuario solo las suyas; el desarrollador las suyas y las que le asignaron. */
     visibleFor(user) {
-      const list = readReq();
-      return user.role === 'desarrollador' || user.role === 'comite' ? list : list.filter((r) => r.autor && r.autor.usuario === user.usuario);
+      if (user.role === 'comite') return readReq();
+      if (user.role === 'desarrollador') {
+        const asg = App.store.assignedTo(user);
+        return App.store.mine(user).concat(asg.filter((r) => !(r.autor && r.autor.usuario === user.usuario)));
+      }
+      return App.store.mine(user);
+    },
+    /* Miembros del comité (excluye al presidente/superadmin): pueden recibir revisiones. */
+    committeeMembers() {
+      return USERS.filter((u) => u.role === 'comite' && !u.superadmin).map((u) => ({ usuario: u.user, nombre: u.name }));
+    },
+    /* Cuentas de desarrollador (para que el comité asigne la implementación). */
+    developers() {
+      return USERS.filter((u) => u.role === 'desarrollador').map((u) => ({ usuario: u.user, nombre: u.name }));
     },
     get: (id) => readReq().find((r) => r.id === id) || null,
     exists: (id) => readReq().some((r) => r.id === id),

@@ -286,7 +286,7 @@ textarea{
   field-sizing:content;
   line-height:1.45;
 }
-textarea#rollback{
+textarea#rollback,textarea#rollout{
   min-height:98px;
 }
 ::placeholder{color:#8c9aa8;opacity:.9}
@@ -814,7 +814,6 @@ tbody tr:hover{
   .panel{padding:16px 14px}
   .prs{grid-template-columns:1fr}
   .sum-grid{grid-template-columns:1fr;gap:12px;padding:12px 14px}
-  .print-signatures{grid-template-columns:1fr;gap:12px}
   .toolbar .spacer{display:none}
 }
 
@@ -831,45 +830,6 @@ tbody tr:hover{
   letter-spacing:.6px;
   color:var(--brand-d);
   margin-bottom:2px;
-}
-.print-signatures{
-  display:grid;
-  grid-template-columns:repeat(3, 1fr);
-  gap:16px;
-  margin:18px 0 14px;
-  padding:16px 14px;
-  background:var(--soft);
-  border:1px solid var(--line);
-  border-radius:8px;
-  text-align:center;
-}
-.print-sig-col{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-}
-.print-sig-line{
-  width:85%;
-  border-bottom:1px dashed #64748b;
-  margin:28px auto 6px;
-}
-.print-sig-role{
-  font-size:.8rem;
-  font-weight:700;
-  color:var(--ink);
-}
-.print-sig-sub{
-  font-size:.72rem;
-  color:var(--mute);
-  margin-top:2px;
-}
-.print-doc-footer{
-  text-align:center;
-  font-size:.72rem;
-  color:var(--mute);
-  margin-top:10px;
-  padding-top:8px;
-  border-top:1px solid var(--line);
 }
 
 /* ---------- Impresión profesional: Formulario completo en UNA SOLA HOJA ---------- */
@@ -1065,56 +1025,6 @@ tbody tr:hover{
     line-height: 1.2 !important;
   }
 
-  /* Bloque de Firmas y Dictamen CCB en el pie de hoja */
-  .print-signatures {
-    display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: 16px !important;
-    margin: 10px 0 6px 0 !important;
-    padding: 10px 8px !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 5px !important;
-    background: #ffffff !important;
-    text-align: center !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .print-sig-col {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-  }
-
-  .print-sig-line {
-    width: 85% !important;
-    border-bottom: 1px solid #475569 !important;
-    margin: 24px auto 4px !important;
-  }
-
-  .print-sig-role {
-    font-size: 9pt !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-  }
-
-  .print-sig-sub {
-    font-size: 8pt !important;
-    color: #64748b !important;
-    margin-top: 1px !important;
-  }
-
-  .print-doc-footer {
-    display: block !important;
-    text-align: center !important;
-    font-size: 7.5pt !important;
-    color: #64748b !important;
-    margin-top: 6px !important;
-    padding-top: 4px !important;
-    border-top: 1px solid #e2e8f0 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
 }
 
 /* =====================================================================
@@ -1128,6 +1038,8 @@ tbody tr:hover{
 .st-aprobada{--st-bg:#dcfce7;--st-ink:#166534;--st-line:#9ddbb1}
 .st-rechazada{--st-bg:#fde2e2;--st-ink:#991b1b;--st-line:#f0a8a8}
 .st-implementada{--st-bg:#ede9fe;--st-ink:#5b21b6;--st-line:#c4b5fd}
+.st-implementacion{--st-bg:#ccfbf1;--st-ink:#0f766e;--st-line:#7dd3c8}
+.st-pr{--st-bg:#ffedd5;--st-ink:#9a3412;--st-line:#fdba74}
 .hist-status-pill[class*="st-"]{background:var(--st-bg);color:var(--st-ink);border-color:var(--st-line)}
 
 /* ---------- Tipo de cambio ---------- */
@@ -1138,6 +1050,11 @@ tbody tr:hover{
 .hist-clase{margin-top:3px}
 
 /* ---------- Avatar ---------- */
+.avatar.dev{background:#0f766e}
+.scope-count{display:inline-block;min-width:18px;margin-left:4px;padding:0 6px;border-radius:999px;font-size:.72rem;font-weight:700;background:rgba(0,0,0,.08)}
+.view-toggle button[aria-pressed="true"] .scope-count{background:rgba(255,255,255,.28)}
+.assign-dev{margin-top:10px}
+.assign-dev .l{margin-bottom:4px;color:var(--mute);font-size:.78rem}
 .avatar{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:.66rem;font-weight:700;flex-shrink:0;vertical-align:middle}
 
 /* ---------- Conmutador Tablero / Lista ---------- */
@@ -1154,7 +1071,7 @@ tbody tr:hover{
 
 /* ---------- Tablero ---------- */
 .board{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 12px;align-items:flex-start;min-height:320px}
-.board-col{flex:1 1 200px;min-width:200px;max-width:340px;background:var(--soft);border:1px solid var(--line);border-top:3px solid var(--st-line,var(--line));border-radius:8px;display:flex;flex-direction:column;transition:box-shadow .15s,opacity .15s}
+.board-col{flex:1 1 150px;min-width:150px;max-width:340px;background:var(--soft);border:1px solid var(--line);border-top:3px solid var(--st-line,var(--line));border-radius:8px;display:flex;flex-direction:column;transition:box-shadow .15s,opacity .15s}
 .board-col-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px 7px}
 .board-col-title{font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--st-ink,var(--ink))}
 .board-col-count{font-size:.72rem;font-weight:700;min-width:22px;text-align:center;padding:1px 7px;border-radius:999px;background:var(--st-bg,var(--card));color:var(--st-ink,var(--ink));border:1px solid var(--st-line,var(--line))}
@@ -1248,3 +1165,20 @@ button.btn.tr-neutral:hover{background:var(--soft)}
   .detail-layout { display: block !important; }
   #detailStatus.ok { background: #fff !important; }
 }
+
+/* ---------- Trabajo en Git (rama de trabajo) ---------- */
+.git-link{color:var(--brand-d);font-weight:600;overflow-wrap:anywhere}
+.hist-branch{margin-top:3px;font-size:.72rem;color:#0f766e;overflow-wrap:anywhere}
+.git-msg{margin:6px 0;padding:7px 10px;border-radius:6px;font-size:.78rem;border:1px solid var(--line);background:var(--soft);color:#334155}
+.git-msg.ok{background:#dcfce7;border-color:#9ddbb1;color:#166534}
+.git-msg.warn{background:#fef3c7;border-color:#f3d37a;color:#92400e}
+.git-msg.info{background:#e0efff;border-color:#9cc4f5;color:#1d4ed8}
+.git-cmd{margin:6px 0 0;padding:6px 8px;background:#0f172a;color:#e2e8f0;border-radius:5px;font:.74rem/1.45 Consolas,Monaco,"Courier New",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+#gitCard .f{margin-bottom:8px}
+#gitCard .side-actions{margin-top:6px}
+
+/* ---------- Implementación y revisión del Pull Request ---------- */
+.impl-log{margin-top:18px}
+.check-row{display:flex;align-items:flex-start;gap:8px;margin:8px 0;font-size:.84rem;cursor:pointer}
+.check-row input{margin-top:3px;flex-shrink:0}
+.tl-avance .act-text{border-left-color:#0f766e}

@@ -107,7 +107,7 @@
     $('login-view').hidden = true;
     $('app-view').hidden = false;
     if ($('whoName')) $('whoName').textContent = user.name;
-    const roleTxt = ROLE_LABEL[user.role] || user.role;
+    const roleTxt = user.cargo || ROLE_LABEL[user.role] || user.role;
     if ($('whoRole')) $('whoRole').textContent = roleTxt;
     if ($('formRoleBadge')) $('formRoleBadge').textContent = roleTxt;
     if ($('histRoleBadge')) $('histRoleBadge').textContent = roleTxt;
@@ -136,6 +136,8 @@
     App.Auth.init();
     App.History.init();
     App.Review.init();
+    App.GitBranch.init();
+    App.Impl.init();
     if ($('btnLogout')) $('btnLogout').addEventListener('click', App.logout);
     if ($('btnLogoutHist')) $('btnLogoutHist').addEventListener('click', App.logout);
     if ($('btnLogoutForm')) $('btnLogoutForm').addEventListener('click', App.logout);

@@ -13,12 +13,12 @@
   const STEPS = [
     { title: 'Identificación y Git', role: 'DEV' },
     { title: 'Información del cambio', role: 'DEV' },
-    { title: 'Riesgo y rollback', role: 'DEV / QA' },
+    { title: 'Riesgo y pruebas', role: 'DEV / QA' },
   ];
   const STEP_FIELDS = [
     ['fechaSolicitud', 'fechaRequerida', 'solicitante', 'leadReviewer', 'departamento', 'correo', 'repositorio', 'ramaOrigen', 'ramaDestino'],
-    ['sistema', 'claseCambio', 'tipoCambio', 'prioridad', 'origen', 'descripcion', 'justificacion'],
-    ['riesgo', 'ambiente', 'pruebas', 'rollback'],
+    ['sistema', 'claseCambio', 'tipoCambio', 'prioridad', 'origen', 'descripcion', 'justificacion', 'rollout', 'rollback'],
+    ['riesgo', 'ambiente', 'pruebas'],
   ];
   const ALL_FIELDS = ['codigo'].concat(STEP_FIELDS[0], STEP_FIELDS[1], STEP_FIELDS[2]);
   const MSG_SENT = 'Solicitud validada y enviada. Queda pendiente de dictamen del Comité de Control de Cambios (CCB).';
@@ -67,7 +67,8 @@
       riesgo: {},
       ambiente: {},
       pruebas: { min: 20 },
-      rollback: { min: 20 },
+      rollout: { min: 30 },
+      rollback: { min: 30 },
     };
   }
 
@@ -192,7 +193,7 @@
   function autoResize(ta) {
     if (!ta) return;
     ta.style.height = 'auto';
-    const minH = ta.id === 'rollback' ? 98 : 72;
+    const minH = ta.id === 'rollback' || ta.id === 'rollout' ? 98 : 72;
     ta.style.height = Math.max(ta.scrollHeight, minH) + 'px';
   }
 
@@ -233,7 +234,8 @@
     q('riesgo').value = 'Medio';
     q('ambiente').value = 'Producción';
     q('pruebas').value = 'Pruebas unitarias ejecutadas con Jest (92% de cobertura). Pruebas de integración superadas en ambiente QA con 100 usuarios concurrentes sin fallos HTTP 500.';
-    q('rollback').value = '1. git revert -m 1 HEAD\n2. Ejecutar rollback de base de datos: npm run db:rollback\n3. Re-desplegar la versión v2.3.9 en el clúster\n4. Verificar logs de monitoreo en Graylog';
+    q('rollout').value = '1. Ventana de despliegue: sábado 22:00-23:00\n2. Respaldar la base de datos\n3. Desplegar la versión v2.4.0 en el clúster (rolling update)\n4. Ejecutar pruebas de humo y validar el login SSO\n5. Notificar al equipo de soporte';
+    q('rollback').value = 'Se activa si falla el login o hay errores HTTP 500 sostenidos.\n1. git revert -m 1 HEAD\n2. Ejecutar rollback de base de datos: npm run db:rollback\n3. Re-desplegar la versión v2.3.9 en el clúster\n4. Verificar logs de monitoreo en Graylog';
     updateCharCounters();
     resizeAllTextareas();
     saveDraft();
@@ -357,12 +359,13 @@
         ['Origen de la solicitud', g('origen')],
         ['Descripción del cambio', g('descripcion'), 'long'],
         ['Justificación técnica', g('justificacion'), 'long'],
+        ['Plan de Rollout (despliegue)', g('rollout'), 'code'],
+        ['Plan de Backout (reversión)', g('rollback'), 'code'],
       ] },
-      { titulo: 'Riesgo, pruebas y plan de reversión', filas: [
+      { titulo: 'Riesgo y pruebas', filas: [
         ['Nivel de riesgo', g('riesgo'), 'tag'],
         ['Ambiente de despliegue', g('ambiente')],
         ['Pruebas y cobertura', g('pruebas'), 'long'],
-        ['Plan de reversión (rollback)', g('rollback'), 'code'],
       ] },
     ];
   }

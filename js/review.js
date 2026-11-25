@@ -34,6 +34,7 @@
     const clase = W().claseOf(r);
     const urgent = String(clase).toLowerCase().startsWith('eme');
     const asg = r.asignado && r.asignado.nombre;
+    const imp = r.implementador && r.implementador.nombre;
     const sol = App.History.getSolicitante(r);
     return (
       '<article class="board-card' + (urgent ? ' urgent' : '') + '" draggable="true" tabindex="0" ' +
@@ -46,6 +47,7 @@
           (r.tipo === 'tecnica' ? 'Técnica' : 'Usuario') + '</span>' +
           '<span class="bc-sol">' + App.esc(sol) + '</span>' +
           (asg ? '<span class="avatar" title="Revisor asignado: ' + App.esc(asg) + '">' + App.esc(initials(asg)) + '</span>' : '') +
+          (imp ? '<span class="avatar dev" title="Desarrollador asignado: ' + App.esc(imp) + '">' + App.esc(initials(imp)) + '</span>' : '') +
         '</div>' +
       '</article>'
     );
@@ -148,18 +150,26 @@
       App.toastWarning('No se puede pasar de «' + from + '» a «' + to + '» directamente.');
       return;
     }
+    const faltante = W().guard(rec, to);
+    if (faltante) {
+      App.toastWarning(faltante);
+      return;
+    }
     const need = W().needsComment(to);
     openDecision({
       title: t.label,
       text: rec.id + ' · ' + rec.titulo + ' — ' + from + ' → ' + to,
-      label: need ? 'Motivo (obligatorio; lo verá el solicitante)' : 'Comentario (opcional)',
+      label: need ? 'Comentario (obligatorio; lo verá el solicitante)' : 'Comentario (opcional)',
       required: need,
       confirm: t.label,
       kind: t.kind,
       onConfirm(comment) {
         const upd = App.store.update(id, (r) => {
           r.estado = to;
-          W().log(r, W().activity('estado', App.user, { de: from, a: to, comentario: comment }));
+          const extra = { de: from, a: to, comentario: comment };
+          if (to === 'Implementada' && r.revision && r.revision.version) extra.version = App.Impl.verText(r.revision.version);
+          if (from === 'Revisión de PR' && to === 'En implementación') r.revision = null; // el PR se vuelve a revisar
+          W().log(r, W().activity('estado', App.user, extra));
         });
         if (!upd) return;
         App.toastSuccess(rec.id + ': ' + from + ' → ' + to + '.');
@@ -233,8 +243,9 @@
       T('ambiente', 'Ambiente de implementación', 'select', { options: D('ambiente') }),
       T('descripcion', 'Descripción del cambio', 'textarea', { min: 25, full: true }),
       T('justificacion', 'Justificación del cambio', 'textarea', { min: 25, full: true }),
+      T('rollout', 'Plan de Rollout (despliegue)', 'textarea', { min: 30, full: true, mono: true, plan: true }),
+      T('rollback', 'Plan de Backout (reversión)', 'textarea', { min: 30, full: true, mono: true, plan: true }),
       T('pruebas', 'Pruebas y cobertura', 'textarea', { min: 20, full: true }),
-      T('rollback', 'Plan de reversión (rollback)', 'textarea', { min: 20, full: true, mono: true }),
     ];
   }
 
@@ -258,9 +269,7 @@
       C('justificacion', 'Motivo / beneficio', 'textarea', { min: 15, full: true }),
       { key: 'aceptacion', label: 'Criterio de éxito', kind: 'textarea', optional: true, full: true,
         get: (r) => (r.planificacion && r.planificacion.criteriosAceptacion) || '',
-        set: (r, v) => { r.planificacion.criteriosAceptacion = v; } },
-      C('referencias', 'Referencia / enlace', 'text', { optional: true, full: true }),
-    ];
+        set: (r, v) => { r.planificacion.criteriosAceptacion = v; } },    ];
   }
 
   /* Tras editar, se recalculan los campos derivados y la ficha impresa. */
@@ -292,7 +301,8 @@
     return '<input id="' + id + '" type="' + (f.kind === 'date' ? 'date' : 'text') + '" value="' + App.esc(value) + '" />';
   }
 
-  function openEdit(id) {
+  /* soloPlanes: abre el diálogo solo con el Rollout y el Backout (el comité los detalla antes de ejecutar). */
+  function openEdit(id, soloPlanes) {
     const rec = App.store.get(id);
     if (!rec) return;
     if (W().isClosed(rec.estado)) {
@@ -301,8 +311,11 @@
     }
     editId = id;
     editFields = rec.tipo === 'tecnica' ? techFields() : userFields();
+    if (soloPlanes) editFields = editFields.filter((f) => f.plan);
 
-    $('editText').textContent = rec.id + ' · ' + rec.titulo;
+    $('editTitle').textContent = soloPlanes ? 'Detallar planes de Rollout y Backout' : 'Modificar solicitud';
+    $('editText').textContent = rec.id + ' · ' + rec.titulo +
+      (soloPlanes ? ' — Amplíe y aclare los planes del desarrollador para que la ejecución quede sin dudas.' : '');
     $('editFields').innerHTML =
       editFields.map((f) =>
         '<div class="f' + (f.full ? ' full' : '') + '">' +
@@ -376,6 +389,84 @@
     return '<div class="side-row"><dt>' + App.esc(label) + '</dt><dd>' + html + '</dd></div>';
   }
 
+  /* Rollout y Backout: el comité puede ampliarlos antes de pasar la solicitud a ejecución. */
+  function plansCard(rec, comite) {
+    if (!comite || rec.tipo !== 'tecnica' || W().isClosed(rec.estado)) return '';
+    const d = rec.datos || {};
+    const faltan = !(d.rollout && d.rollback);
+    return (
+      '<div class="side-card">' +
+        '<h3 class="side-h">Planes de ejecución</h3>' +
+        '<p class="side-note" style="margin-top:0">' +
+          (faltan ? 'Falta el Rollout o el Backout. ' : '') +
+          'Revise el plan de despliegue (Rollout) y el de reversión (Backout) del desarrollador y amplíelos antes de aprobar.' +
+        '</p>' +
+        '<div class="side-actions"><button type="button" class="btn sm" data-edit-plans="1">Detallar Rollout y Backout</button></div>' +
+      '</div>'
+    );
+  }
+
+  /* Desarrollador que implementa el cambio: lo asigna el comité cuando la solicitud está aprobada. */
+  function implementationCard(rec, comite) {
+    const imp = rec.implementador && rec.implementador.nombre;
+    const aprobada = W().normalize(rec.estado) === 'Aprobada';
+    let html =
+      '<div class="side-card">' +
+        '<h3 class="side-h">Implementación</h3>' +
+        '<dl class="side-dl">' +
+          dlRow('Desarrollador', imp ? '<span class="avatar dev">' + App.esc(initials(imp)) + '</span> ' + App.esc(imp) : '<span class="preview-empty">Sin asignar</span>') +
+        '</dl>';
+    if (comite && aprobada) {
+      html +=
+        '<div class="assign-dev">' +
+          '<label class="l" for="devSelect">' + (imp ? 'Reasignar a' : 'Asignar a') + '</label>' +
+          '<select id="devSelect"><option value="">Seleccione…</option>' +
+            App.store.developers().map((d) =>
+              '<option value="' + App.esc(d.usuario) + '"' + (rec.implementador && rec.implementador.usuario === d.usuario ? ' selected' : '') + '>' + App.esc(d.nombre) + '</option>').join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="side-actions">' +
+          '<button type="button" class="btn sm" data-assign-dev="set">' + (imp ? 'Reasignar' : 'Asignar desarrollador') + '</button>' +
+          (imp ? '<button type="button" class="btn sm sec" data-assign-dev="none">Quitar asignación</button>' : '') +
+        '</div>';
+    } else if (comite && !imp && !W().isClosed(rec.estado) && W().normalize(rec.estado) !== 'Rechazada') {
+      html += '<p class="side-note">Se asigna cuando la solicitud esté aprobada.</p>';
+    }
+    return html + '</div>';
+  }
+
+  /* Asignación del revisor. El presidente asigna a cualquier miembro; un miembro solo puede
+     tomar una revisión libre o soltar la suya. */
+  function reviewControls(rec, user, asg, mine) {
+    const closed = W().isClosed(rec.estado);
+    let html = '';
+    if (!closed) {
+      if (user.superadmin) {
+        html +=
+          '<div class="assign-dev"><label class="l" for="revSelect">' + (asg ? 'Reasignar revisión a' : 'Asignar revisión a') + '</label>' +
+            '<select id="revSelect"><option value="">Seleccione…</option>' +
+            App.store.committeeMembers().map((m) =>
+              '<option value="' + App.esc(m.usuario) + '"' + (rec.asignado && rec.asignado.usuario === m.usuario ? ' selected' : '') + '>' + App.esc(m.nombre) + '</option>').join('') +
+            '</select></div>' +
+          '<div class="side-actions">' +
+            '<button type="button" class="btn sm" data-assign-rev="set">' + (asg ? 'Reasignar' : 'Asignar revisor') + '</button>' +
+            (!mine ? '<button type="button" class="btn sm sec" data-assign-rev="me">Asignarme</button>' : '') +
+            (asg ? '<button type="button" class="btn sm sec" data-assign-rev="none">Quitar asignación</button>' : '') +
+          '</div>';
+      } else if (!asg) {
+        html += '<div class="side-actions"><button type="button" class="btn sm" data-assign-rev="me">Asignarme esta revisión</button></div>';
+      } else if (mine) {
+        html += '<div class="side-actions"><button type="button" class="btn sm sec" data-assign-rev="none">Soltar mi revisión</button></div>';
+      } else {
+        html += '<p class="side-note">La revisión está a cargo de ' + App.esc(asg) + '. Solo el presidente del comité puede reasignarla.</p>';
+      }
+    }
+    if (!closed) {
+      html += '<div class="side-actions"><button type="button" class="btn sm sec" data-edit-rec="1">Modificar solicitud</button></div>';
+    }
+    return html;
+  }
+
   function sideHTML(rec, user) {
     const comite = isCommittee(user);
     const st = W().info(rec.estado);
@@ -405,15 +496,13 @@
         '<dl class="side-dl">' +
           dlRow('Revisor asignado', asg ? '<span class="avatar">' + App.esc(initials(asg)) + '</span> ' + App.esc(asg) : '<span class="preview-empty">Sin asignar</span>') +
         '</dl>';
-    if (comite) {
-      html += '<div class="side-actions">' +
-        (mine
-          ? '<button type="button" class="btn sm sec" data-assign="none">Quitar asignación</button>'
-          : '<button type="button" class="btn sm sec" data-assign="me">' + (asg ? 'Tomar revisión' : 'Asignarme') + '</button>') +
-        (!W().isClosed(rec.estado) ? '<button type="button" class="btn sm sec" data-edit-rec="1">Modificar solicitud</button>' : '') +
-        '</div>';
-    }
+    if (comite) html += reviewControls(rec, user, asg, mine);
     html += '</div>';
+
+    html += plansCard(rec, comite);
+    html += implementationCard(rec, comite);
+    html += App.GitBranch.cardHTML(rec, user);
+    html += App.Impl.sideHTML(rec, user);
 
     html +=
       '<div class="side-card">' +
@@ -443,7 +532,14 @@
         return 'creó la solicitud.';
       case 'estado':
         return 'cambió el estado: ' + W().pill(a.de) + ' <span aria-hidden="true">→</span> ' + W().pill(a.a) +
+          (a.pr ? ' · Pull Request ' + (a.prUrl ? '<a class="git-link mono" target="_blank" rel="noopener noreferrer" href="' + App.esc(a.prUrl) + '">' + App.esc(a.pr) + '</a>' : '<span class="mono">' + App.esc(a.pr) + '</span>') : '') +
+          (a.version ? ' · versión <b>' + App.esc(a.version) + '</b>' : '') +
           (a.comentario ? '<div class="act-text">' + App.esc(a.comentario) + '</div>' : '');
+      case 'avance':
+        return 'registró una actividad:<div class="act-text">' + App.esc(a.texto) + '</div>';
+      case 'revision':
+        return 'guardó la revisión del Pull Request: PR revisado <b>' + (a.prRevisado ? 'sí' : 'no') + '</b>, merge a develop <b>' +
+          (a.mergeDevelop ? 'verificado' : 'sin verificar') + '</b>' + (a.version ? ', versión <b>' + App.esc(a.version) + '</b>' : ', sin versión') + '.';
       case 'edicion':
         return 'modificó la solicitud:' +
           '<ul class="act-changes">' +
@@ -453,6 +549,12 @@
           (a.comentario ? '<div class="act-text"><b>Motivo:</b> ' + App.esc(a.comentario) + '</div>' : '');
       case 'asignacion':
         return a.a ? 'asignó la revisión a <b>' + App.esc(a.a) + '</b>.' : 'quitó la asignación de revisión.';
+      case 'rama':
+        return (a.anterior ? 'cambió la rama de trabajo de <code>' + App.esc(a.anterior) + '</code> a ' : 'definió la rama de trabajo ') +
+          '<a class="git-link mono" target="_blank" rel="noopener noreferrer" href="' + App.esc(App.GitBranch.branchUrl(a.repositorio, a.rama)) + '">' + App.esc(a.rama) + '</a>' +
+          ' en <b>' + App.esc(a.repositorio) + '</b>.';
+      case 'implementador':
+        return a.a ? 'asignó la implementación a <b>' + App.esc(a.a) + '</b>.' : 'quitó la asignación del desarrollador.';
       case 'comentario':
         return 'comentó:<div class="act-text">' + App.esc(a.texto) + '</div>';
       default:
@@ -489,25 +591,64 @@
   function renderDetail(rec, user) {
     curId = rec.id;
     $('detailSide').innerHTML = sideHTML(rec, user);
+    $('detailImpl').innerHTML = App.Impl.mainHTML(rec, user);
+    $('detailImpl').hidden = !$('detailImpl').innerHTML;
     $('detailActivity').innerHTML = activityHTML(rec, user);
-
-    // Dictamen impreso en la ficha (casilla del Comité CCB)
-    const est = W().normalize(rec.estado);
-    const ok = est === 'Aprobada' || est === 'Implementada';
-    const no = est === 'Rechazada';
-    $('detailDictamen').innerHTML =
-      '[ ' + (ok ? '<b>X</b>' : '&nbsp;') + ' ] Aprobado &nbsp;&nbsp; [ ' + (no ? '<b>X</b>' : '&nbsp;') + ' ] Rechazado';
   }
 
-  function assign(me) {
-    const id = curId;
-    const upd = App.store.update(id, (r) => {
-      r.asignado = me ? { usuario: App.user.usuario, nombre: App.user.name } : null;
-      W().log(r, W().activity('asignacion', App.user, { a: me ? App.user.name : '' }));
+  function assignReview(usuario) {
+    const rec = App.store.get(curId);
+    if (!rec || W().isClosed(rec.estado)) return;
+    const me = App.user;
+    const cur = (rec.asignado && rec.asignado.usuario) || '';
+    let target = null;
+    if (usuario) {
+      target = usuario === me.usuario
+        ? { usuario: me.usuario, nombre: me.name }
+        : App.store.committeeMembers().find((m) => m.usuario === usuario) || null;
+      if (!target) return;
+    }
+    if (!me.superadmin) {
+      if (usuario && (usuario !== me.usuario || cur)) {
+        App.toastWarning('Solo el presidente del comité puede reasignar una revisión.');
+        return;
+      }
+      if (!usuario && cur !== me.usuario) {
+        App.toastWarning('Solo puede soltar una revisión que tenga asignada a usted.');
+        return;
+      }
+    }
+    if (cur === usuario) { App.toast('No hay cambios en la asignación.', 'info'); return; }
+    const upd = App.store.update(curId, (r) => {
+      r.asignado = target ? { usuario: target.usuario, nombre: target.nombre } : null;
+      W().log(r, W().activity('asignacion', me, { a: target ? target.nombre : '' }));
     });
     if (!upd) return;
     renderDetail(upd, App.user);
-    App.toastSuccess(me ? 'Revisión asignada a ' + App.user.name + '.' : 'Se quitó la asignación.');
+    App.toastSuccess(target ? 'Revisión asignada a ' + target.nombre + '.' : 'Se quitó la asignación de revisión.');
+  }
+
+  function assignDev(usuario) {
+    const rec = App.store.get(curId);
+    if (!rec) return;
+    if (W().normalize(rec.estado) !== 'Aprobada') {
+      App.toastWarning('Solo se puede asignar un desarrollador cuando la solicitud está aprobada.');
+      return;
+    }
+    const dev = usuario ? App.store.developers().find((d) => d.usuario === usuario) : null;
+    if (usuario && !dev) return;
+    if (!usuario && !rec.implementador) return;
+    if (dev && rec.implementador && rec.implementador.usuario === dev.usuario) {
+      App.toast('Esa solicitud ya está asignada a ' + dev.nombre + '.', 'info');
+      return;
+    }
+    const upd = App.store.update(curId, (r) => {
+      r.implementador = dev ? { usuario: dev.usuario, nombre: dev.nombre } : null;
+      W().log(r, W().activity('implementador', App.user, { a: dev ? dev.nombre : '' }));
+    });
+    if (!upd) return;
+    renderDetail(upd, App.user);
+    App.toastSuccess(dev ? 'Implementación asignada a ' + dev.nombre + '.' : 'Se quitó la asignación del desarrollador.');
   }
 
   function addComment(e) {
@@ -539,8 +680,27 @@
     $('detailSide').addEventListener('click', (e) => {
       const t = e.target.closest('[data-trans]');
       if (t) { transition(curId, t.getAttribute('data-trans')); return; }
-      const a = e.target.closest('[data-assign]');
-      if (a) { assign(a.getAttribute('data-assign') === 'me'); return; }
+      const ar = e.target.closest('[data-assign-rev]');
+      if (ar) {
+        const k = ar.getAttribute('data-assign-rev');
+        if (k === 'me') assignReview(App.user.usuario);
+        else if (k === 'none') assignReview('');
+        else {
+          const sel = $('revSelect');
+          if (!sel || !sel.value) { App.toastWarning('Seleccione un miembro del comité.'); if (sel) sel.focus(); return; }
+          assignReview(sel.value);
+        }
+        return;
+      }
+      const ad = e.target.closest('[data-assign-dev]');
+      if (ad) {
+        if (ad.getAttribute('data-assign-dev') === 'none') { assignDev(''); return; }
+        const sel = $('devSelect');
+        if (!sel || !sel.value) { App.toastWarning('Seleccione un desarrollador.'); if (sel) sel.focus(); return; }
+        assignDev(sel.value);
+        return;
+      }
+      if (e.target.closest('[data-edit-plans]')) { openEdit(curId, true); return; }
       if (e.target.closest('[data-edit-rec]')) openEdit(curId);
     });
     $('detailActivity').addEventListener('submit', (e) => {
@@ -560,5 +720,5 @@
     });
   }
 
-  App.Review = { init, renderBoard, renderDetail, transition, openEdit };
+  App.Review = { init, renderBoard, renderDetail, transition, openEdit, openDecision, current: () => curId };
 })();
